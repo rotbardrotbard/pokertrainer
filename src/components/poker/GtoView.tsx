@@ -21,6 +21,16 @@ import { cn } from '@/lib/utils'
 const GAMES: GameKind[] = ['holdem', 'omaha4', 'omaha5']
 const STREETS: Street[] = ['preflop', 'flop', 'turn', 'river']
 
+/** Параметры для предустановки чартов (например, переход из симулятора раздач). */
+export interface GtoInitial {
+  game?: GameKind
+  players?: number
+  seat?: string // базовая позиция (UTG/MP/CO/BTN/SB/BB)
+  street?: Street
+  situation?: 'open' | 'vsraise'
+  opponents?: number
+}
+
 const ACTION_STYLES: Record<'raise' | 'call' | 'fold', string> = {
   raise: 'bg-emerald-500/90 text-stone-950',
   call: 'bg-sky-700/90 text-stone-50',
@@ -33,13 +43,23 @@ const TIER_DOT: Record<'bet' | 'call' | 'fold', string> = {
   fold: 'bg-red-500',
 }
 
-export function GtoView({ onBack }: { onBack: () => void }) {
-  const [game, setGame] = useState<GameKind>('holdem')
-  const [players, setPlayers] = useState(6)
-  const [seat, setSeat] = useState('BTN')
-  const [opponents, setOpponents] = useState(0) // 0 только для «открытия» на префлопе
-  const [street, setStreet] = useState<Street>('preflop')
-  const [situation, setSituation] = useState<'open' | 'vsraise'>('open')
+export function GtoView({ onBack, initial }: { onBack: () => void; initial?: GtoInitial | null }) {
+  // предустановка из симулятора: валидируем место за столом под размер стола
+  const [game, setGame] = useState<GameKind>(initial?.game ?? 'holdem')
+  const [players, setPlayers] = useState(initial?.players ?? 6)
+  const [seat, setSeat] = useState(() => {
+    const p = initial?.players ?? 6
+    const seats = seatsForTable(p)
+    if (initial?.seat) {
+      const bp = basePos(initial.seat)
+      const match = seats.find((s) => basePos(s) === bp)
+      if (match) return match
+    }
+    return seats.includes('CO') ? 'CO' : seats[0]
+  })
+  const [opponents, setOpponents] = useState(initial?.opponents ?? 0) // 0 только для «открытия» на префлопе
+  const [street, setStreet] = useState<Street>(initial?.street ?? 'preflop')
+  const [situation, setSituation] = useState<'open' | 'vsraise'>(initial?.situation ?? 'open')
 
   const seats = seatsForTable(players)
   const maxOpp = Math.min(players - 1, 8)

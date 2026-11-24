@@ -1,10 +1,13 @@
 'use client'
 
 // Симулятор раздач для Омахи с двумя досками: 4-card и 5-card.
-// Префлоп: открытие и защита по профилю руки. Постфлоп: решения по эквити двух досок.
+// Префлоп: решения по GTO-чартам позиции (как в разделе GTO-чарты).
+// Постфлоп: решения по эквити двух досок. После ответа — чарт позиции и переход в GTO.
 import { useState } from 'react'
+import { Compass, ArrowUpRight } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { CardRow } from './PlayingCard'
 import { TrainerShell, Feedback, ScenarioCard } from './TrainerShell'
 import { useStats } from '@/store/stats'
@@ -14,6 +17,9 @@ import {
   genOmahaSimScenario,
 } from '@/lib/poker/omahaSim'
 import { POSITION_NAMES_RU } from '@/lib/poker/ranges'
+import type { GameKind } from '@/lib/poker/handRanges'
+import type { Street } from '@/lib/poker/gto'
+import type { GtoInitial } from './GtoView'
 import { cn } from '@/lib/utils'
 
 type DoubleVariant = 'double4' | 'double5'
@@ -36,11 +42,117 @@ const META: Record<DoubleVariant, { title: string; subtitle: string; badge: stri
   },
 }
 
+const CHIP_STYLES: Record<'raise' | 'call' | 'fold', string> = {
+  raise: 'bg-emerald-500/90 text-stone-950',
+  call: 'bg-sky-700/90 text-stone-50',
+  fold: 'bg-stone-800/70 text-stone-500',
+}
+
+const ACTION_RU: Record<OmahaSimAction, string> = {
+  raise: 'рейз',
+  call: 'колл',
+  fold: 'фолд',
+}
+
 function boardStreetLabel(n: number): string {
   return n === 3 ? 'Флоп' : n === 4 ? 'Терн' : 'Ривер'
 }
 
-export function OmahaSimView({ variant, onBack }: { variant: DoubleVariant; onBack: () => void }) {
+/** Параметры GTO-чартов для текущей ситуации (переход из симулятора). */
+function gtoInitFor(scenario: OmahaSimScenario): GtoInitial {
+  const game: GameKind = scenario.holeCount === 4 ? 'omaha4' : 'omaha5'
+  if (scenario.kind === 'postflop') {
+    const [n1, n2] = scenario.boardStreets!
+    const street: Street = n1 === n2 ? (n1 === 3 ? 'flop' : 'turn') : 'flop'
+    return { game, street, seat: 'BB', opponents: 1 }
+  }
+  return {
+    game,
+    players: scenario.players,
+    seat: scenario.position,
+    street: 'preflop',
+    situation: scenario.kind === 'open' ? 'open' : 'vsraise',
+    opponents: scenario.kind === 'open' ? 0 : 1,
+  }
+}
+
+function OpenGtoButton({ scenario, onOpenGto }: { scenario: OmahaSimScenario; onOpenGto?: (init: GtoInitial) => void }) {
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => onOpenGto?.(gtoInitFor(scenario))}
+      disabled={!onOpenGto}
+      className="border-emerald-700 text-emerald-300 hover:bg-emerald-900/40 hover:text-emerald-200 h-8 shrink-0"
+    >
+      Открыть в GTO-чартах
+      <ArrowUpRight className="w-3.5 h-3.5" />
+    </Button>
+  )
+}
+
+/** Панель GTO-чарта позиции (префлоп): диапазон рейза/колла и место руки. */
+function GtoChartPanel({ scenario, onOpenGto }: { scenario: OmahaSimScenario; onOpenGto?: (init: GtoInitial) => void }) {
+  const chart = scenario.chart!
+  const chips: Array<{ text: string; action: 'raise' | 'call' | 'fold' }> = scenario.kind === 'open'
+    ? [
+        { text: `Рейз: топ ~${Math.round(chart.openPercent)}% рук`, action: 'raise' },
+        { text: 'Фолд: остальное', action: 'fold' },
+      ]
+    : [
+        { text: `3бет: топ ~${Math.round(chart.threeBetPercent)}%`, action: 'raise' },
+        { text: `Колл: топ ~${Math.round(chart.callPercent)}%`, action: 'call' },
+        { text: 'Фолд: остальное', action: 'fold' },
+      ]
+  return (
+    <Card className="border-emerald-800/60 bg-emerald-950/40">
+      <CardContent className="p-4 flex flex-col gap-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h3 className="text-sm font-normal text-stone-100 flex items-center gap-2 min-w-0">
+            <Compass className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="truncate">
+              GTO-чарт · {POSITION_NAMES_RU[scenario.position]} · стол {scenario.players}-max
+            </span>
+          </h3>
+          <OpenGtoButton scenario={scenario} onOpenGto={onOpenGto} />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {chips.map((c, i) => (
+            <span key={i} className={cn('px-3 py-1.5 rounded-md text-xs font-normal', CHIP_STYLES[c.action])}>
+              {c.text}
+            </span>
+          ))}
+        </div>
+        <p className="text-xs text-stone-300">
+          Ваша рука — топ ~{scenario.handPct}% всех стартовых рук {scenario.holeCount}-card Омахи: по чарту это{' '}
+          <b className="text-stone-100 font-normal">{ACTION_RU[scenario.correctAction]}</b>.
+        </p>
+      </CardContent>
+    </Card>
+  )
+}
+
+/** Панель GTO-ориентира (постфлоп): тир руки и рекомендация. */
+function GtoPostflopPanel({ scenario, streetLabel, onOpenGto }: { scenario: OmahaSimScenario; streetLabel: string; onOpenGto?: (init: GtoInitial) => void }) {
+  return (
+    <Card className="border-emerald-800/60 bg-emerald-950/40">
+      <CardContent className="p-4 flex flex-col gap-2.5">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h3 className="text-sm font-normal text-stone-100 flex items-center gap-2 min-w-0">
+            <Compass className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="truncate">GTO-ориентир · {streetLabel} · 1 оппонент</span>
+          </h3>
+          <OpenGtoButton scenario={scenario} onOpenGto={onOpenGto} />
+        </div>
+        <p className="text-xs text-stone-300">
+          Тир руки по чарту: <b className="text-stone-100 font-normal">{scenario.gtoHint}</b>.
+        </p>
+      </CardContent>
+    </Card>
+  )
+}
+
+export function OmahaSimView({ variant, onBack, onOpenGto }: { variant: DoubleVariant; onBack: () => void; onOpenGto?: (init: GtoInitial) => void }) {
   const record = useStats((s) => s.recordAnswer)
   const trainerId = TRAINER_BY_VARIANT[variant]
   const meta = META[variant]
@@ -67,13 +179,13 @@ export function OmahaSimView({ variant, onBack }: { variant: DoubleVariant; onBa
           <p className="text-sm text-stone-300">
             Симулятор раздач {holeCount}-card Омахи на двух досках. Каждая раздача — реальные
             решения: открыть, защищаться против рейза, играть постфлоп на двух бордах.
-            После ответа — разбор с эквити по каждой доске.
+            После ответа — разбор с GTO-чартом позиции и эквити по каждой доске.
           </p>
           <ul className="text-xs text-stone-400 list-disc pl-4 flex flex-col gap-1">
             <li>Комбинация — ровно 2 карты руки + 3 с доски</li>
             <li>Каждая доска — отдельная половина банка, эквити усредняется</li>
-            <li>Префлоп оценивается по профилю: масти, связки, тузы</li>
-            <li>Постфлоп — Monte-Carlo эквити против случайной руки Омахи</li>
+            <li>Префлоп — по GTO-чартам позиции: диапазон зависит от позиции и размера стола (2–9 max)</li>
+            <li>После ответа — чарт позиции и переход в раздел GTO с вашими параметрами</li>
           </ul>
           <Button onClick={next} className="bg-emerald-600 text-white hover:bg-emerald-500">
             Начать сессию
@@ -121,6 +233,11 @@ export function OmahaSimView({ variant, onBack }: { variant: DoubleVariant; onBa
           <Badge variant="outline" className="border-stone-600 text-stone-300">
             {POSITION_NAMES_RU[scenario.position]}
           </Badge>
+          {scenario.kind !== 'postflop' && (
+            <Badge variant="outline" className="border-stone-600 text-stone-400">
+              Стол {scenario.players}-max
+            </Badge>
+          )}
         </div>
 
         <div className="flex flex-col gap-3">
@@ -194,6 +311,16 @@ export function OmahaSimView({ variant, onBack }: { variant: DoubleVariant; onBa
                 <p className="text-lg text-stone-100 font-normal">{scenario.requiredPct}%</p>
               </div>
             </div>
+          )}
+          {!isPostflop && scenario.chart && (
+            <GtoChartPanel scenario={scenario} onOpenGto={onOpenGto} />
+          )}
+          {isPostflop && scenario.gtoHint && (
+            <GtoPostflopPanel
+              scenario={scenario}
+              streetLabel={boardStreetLabel(scenario.boardStreets![0])}
+              onOpenGto={onOpenGto}
+            />
           )}
         </>
       )}

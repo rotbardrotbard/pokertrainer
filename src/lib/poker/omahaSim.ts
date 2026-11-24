@@ -1,11 +1,15 @@
 // Симулятор раздач для Омахи с двумя досками (4-card / 5-card).
-// Префлоп: решения по профилю стартовой руки (мастевость, связки, тузы).
+// Префлоп: решения по GTO-чартам позиции — те же диапазоны, что в разделе GTO
+// (размер стола меняет ширину диапазона, рука оценивается как «топ X%»).
 // Постфлоп: Monte-Carlo эквити на двух досках против случайной руки,
 // решение по пот-оддсам (на каждой доске разыгрывается половина банка).
 import { Card, fullDeck, RANK_CHARS } from './cards'
 import { handName } from './evaluator'
 import { bestOmahaHand } from './omaha'
 import { Position, POSITION_NAMES_RU } from './ranges'
+import { seatsForTable, basePos, omahaPreflop, omahaAction, omahaEquityTier } from './gto'
+import type { OmahaPreflop } from './gto'
+import { omahaHandPercentile } from './handRanges'
 
 // ============ Быстрый оценщик 5 карт (без аллокаций) ============
 // score в том же формате, что evaluate5 (packScore: cat*15^5 + tiebreak, base 15).
@@ -308,6 +312,10 @@ export interface OmahaSimScenario {
   boards: [Card[], Card[]] | null // только postflop
   boardStreets: [number, number] // длины досок (для подписи улицы)
   position: Position
+  players: number // размер стола (влияет на ширину диапазона)
+  chart: OmahaPreflop | null // GTO-чарт позиции (префлоп)
+  handPct: number | null // место руки: «топ X%» стартовых рук (префлоп)
+  gtoHint: string | null // постфлоп: ориентир из GTO-чарта
   prompt: string
   actionLabels: { fold: string; call: string | null; raise: string }
   correctAction: OmahaSimAction
@@ -326,6 +334,20 @@ export interface OmahaSimScenario {
 const ri = (n: number) => Math.floor(Math.random() * n)
 const pick = <T,>(arr: T[]): T => arr[ri(arr.length)]
 
+// размеры стола в симуляторе: от хедз-апа до 9-max
+const SIM_TABLES = [2, 3, 4, 5, 6, 9] as const
+
+function gameOf(holeCount: 4 | 5): 'omaha4' | 'omaha5' {
+  return holeCount === 4 ? 'omaha4' : 'omaha5'
+}
+
+/** Уникальные базовые позиции стола в порядке действия (без BB, если excludeBB). */
+function tablePositions(players: number, excludeBB: boolean): Position[] {
+  const seats = seatsForTable(players).map(basePos)
+  const uniq = [...new Set(seats)]
+  return excludeBB ? uniq.filter((p) => p !== 'BB') : uniq
+}
+
 function shuffled(): Card[] {
   return shuffleIn(fullDeck())
 }
@@ -339,17 +361,19 @@ function shuffleIn(deck: Card[]): Card[] {
   return a
 }
 
-// --- Префлоп: открытие из позиции ---
-
-const OPEN_THRESHOLDS: Record<string, number> = { UTG: 58, MP: 52, CO: 46, BTN: 40, SB: 46 }
+// --- Префлоп: открытие из позиции (по GTO-чарту) ---
 
 function genOpenScenario(holeCount: 4 | 5): OmahaSimScenario {
-  const pos = pick<Position>(['UTG', 'MP', 'CO', 'BTN', 'SB'])
+  const game = gameOf(holeCount)
+  const players = pick(SIM_TABLES)
+  const pos = pick(tablePositions(players, true)) // открытие — все позиции кроме BB
   const deck = shuffled()
   const hero = deck.slice(0, holeCount)
   const profile = analyzePloHand(hero)
-  const th = OPEN_THRESHOLDS[pos]
-  const correct: OmahaSimAction = profile.score >= th ? 'raise' : 'fold'
+  const chart = omahaPreflop(game, pos, players, 'open', 0)
+  const correct: OmahaSimAction = omahaAction(game, hero, chart, 'open')
+  const handPct = omahaHandPercentile(game, hero)
+  const raisePct = Math.round(chart.openPercent)
   return {
     holeCount,
     kind: 'open',
@@ -357,7 +381,11 @@ function genOpenScenario(holeCount: 4 | 5): OmahaSimScenario {
     boards: null,
     boardStreets: [0, 0],
     position: pos,
-    prompt: `${POSITION_NAMES_RU[pos]}. До вас все сбросили. Ваше действие?`,
+    players,
+    chart,
+    handPct,
+    gtoHint: null,
+    prompt: `${POSITION_NAMES_RU[pos]} · стол ${players}-max. До вас все сбросили. Ваше действие?`,
     actionLabels: { fold: 'Фолд', call: null, raise: 'Рейз до 3bb' },
     correctAction: correct,
     pot: 1.5,
@@ -369,22 +397,35 @@ function genOpenScenario(holeCount: 4 | 5): OmahaSimScenario {
     heroHands: null,
     heroBest: null,
     explanation: correct === 'raise'
-      ? `Профиль руки: ${profile.desc.toLowerCase()} (оценка ${profile.score}/100) — это диапазон открытия с ${POSITION_NAMES_RU[pos]}. Открывайте рейзом 3–4bb в Омахе.`
-      : `Профиль руки: ${profile.desc.toLowerCase()} (оценка ${profile.score}/100) — слабее диапазона открытия с ${POSITION_NAMES_RU[pos]} (порог ≈${th}/100). Сбрасывайте.`,
-    detail: [...profile.features, `Открытие с ${POSITION_NAMES_RU[pos]} требует оценки ≈${th}+ из 100: чем раньше позиция, тем координированнее должна быть рука.`],
+      ? `Рука — топ ~${handPct}% стартовых (${profile.desc.toLowerCase()}) — входит в диапазон открытия с ${POSITION_NAMES_RU[pos]} (топ ~${raisePct}%). Открывайте рейзом 3–4bb.`
+      : `Рука — топ ~${handPct}% стартовых (${profile.desc.toLowerCase()}) — вне диапазона открытия с ${POSITION_NAMES_RU[pos]} (топ ~${raisePct}%). Сбрасывайте.`,
+    detail: [
+      ...profile.features,
+      `GTO-чарт: открытие с ${POSITION_NAMES_RU[pos]} за столом ${players}-max — рейз с топ ~${raisePct}% рук (оценка структуры ≥ ${Math.round(chart.openThreshold)} из 100).`,
+      `Ваша рука по той же шкале — топ ~${handPct}%: чем раньше позиция и больше стол, тем тайтовее диапазон.`,
+    ],
   }
 }
 
-// --- Префлоп: против рейза ---
+// --- Префлоп: против рейза (по GTO-чарту) ---
 
 function genVsRaiseScenario(holeCount: 4 | 5): OmahaSimScenario {
-  const villainPos = pick<Position>(['UTG', 'MP', 'CO', 'BTN'])
-  const pos = pick<Position>(['MP', 'CO', 'BTN', 'SB', 'BB'])
+  const game = gameOf(holeCount)
+  const players = pick(SIM_TABLES)
+  const seats = seatsForTable(players)
+  const vi = ri(seats.length - 1) // рейзер — любой кроме BB, действует раньше героя
+  const villainPos = basePos(seats[vi])
+  const pos = basePos(pick(seats.slice(vi + 1)))
   const deck = shuffled()
   const hero = deck.slice(0, holeCount)
   const profile = analyzePloHand(hero)
   const openSize = 3
-  const correct: OmahaSimAction = profile.score >= 62 ? 'raise' : profile.score >= 46 ? 'call' : 'fold'
+  // все сбросили до героя: только рейзер в банке (opponents = 1, callers = 0)
+  const chart = omahaPreflop(game, pos, players, 'vsraise', 0)
+  const correct: OmahaSimAction = omahaAction(game, hero, chart, 'vsraise')
+  const handPct = omahaHandPercentile(game, hero)
+  const tbPct = Math.round(chart.threeBetPercent)
+  const callPct = Math.round(chart.callPercent)
   return {
     holeCount,
     kind: 'vsRaise',
@@ -392,7 +433,11 @@ function genVsRaiseScenario(holeCount: 4 | 5): OmahaSimScenario {
     boards: null,
     boardStreets: [0, 0],
     position: pos,
-    prompt: `${villainPos} открывается рейзом до ${openSize}bb. Вы на ${POSITION_NAMES_RU[pos]}. Ваше действие?`,
+    players,
+    chart,
+    handPct,
+    gtoHint: null,
+    prompt: `${villainPos} открывается рейзом до ${openSize}bb (стол ${players}-max). Вы на ${POSITION_NAMES_RU[pos]}. Ваше действие?`,
     actionLabels: { fold: 'Фолд', call: `Колл ${openSize}bb`, raise: '3бет до 12bb' },
     correctAction: correct,
     pot: 1.5 + openSize,
@@ -404,13 +449,14 @@ function genVsRaiseScenario(holeCount: 4 | 5): OmahaSimScenario {
     heroHands: null,
     heroBest: null,
     explanation: correct === 'raise'
-      ? `Профиль руки: ${profile.desc.toLowerCase()} (оценка ${profile.score}/100) — премиальная рука: 3бет для вэлью и инициативы.`
+      ? `Рука — топ ~${handPct}% стартовых (${profile.desc.toLowerCase()}) — в 3бет-диапазоне с ${POSITION_NAMES_RU[pos]} (топ ~${tbPct}%). 3бет для вэлью и инициативы.`
       : correct === 'call'
-        ? `Профиль руки: ${profile.desc.toLowerCase()} (оценка ${profile.score}/100) — играбельная рука: колл и игра постфлоп в позиции.`
-        : `Профиль руки: ${profile.desc.toLowerCase()} (оценка ${profile.score}/100) — слабее диапазона защиты против рейза. Фолд.`,
+        ? `Рука — топ ~${handPct}% стартовых: вне 3бета (топ ~${tbPct}%), но в диапазоне колла с ${POSITION_NAMES_RU[pos]} (топ ~${callPct}%). Колл и игра постфлоп.`
+        : `Рука — топ ~${handPct}% стартовых (${profile.desc.toLowerCase()}) — слабее диапазона защиты с ${POSITION_NAMES_RU[pos]} (колл — топ ~${callPct}%). Фолд.`,
     detail: [
       ...profile.features,
-      'В Омахе диапазоны шире, чем в Холдеме: координированные руки (масти + связки) ценятся выше изолированных тузов.',
+      `GTO-чарт: против рейза с ${POSITION_NAMES_RU[pos]} — 3бет с топ ~${tbPct}%, колл с топ ~${callPct}% рук (стол ${players}-max).`,
+      'Диапазон зависит от размера стола: чем больше игроков, тем тайтовее защита.',
     ],
   }
 }
@@ -456,6 +502,9 @@ function genPostflopScenario(holeCount: 4 | 5): OmahaSimScenario {
         ? 'колл прибылен — эквити выше требуемых пот-оддсов'
         : 'фолд — колл теряет деньги'
     const streetLabel = n1 === n2 ? street1 : `${street1} / ${street2}`
+    // GTO-ориентир по улице (при разных досках берём раннюю — флоп)
+    const gtoStreet: 'flop' | 'turn' = n1 === n2 ? (n1 === 3 ? 'flop' : 'turn') : 'flop'
+    const tier = omahaEquityTier(gameOf(holeCount), gtoStreet, correct)
     const scenario: OmahaSimScenario = {
       holeCount,
       kind: 'postflop',
@@ -463,6 +512,10 @@ function genPostflopScenario(holeCount: 4 | 5): OmahaSimScenario {
       boards: [b1, b2],
       boardStreets: [n1, n2],
       position: 'BB',
+      players: 6,
+      chart: null,
+      handPct: null,
+      gtoHint: `${tier.tier} — против ставки: ${tier.facingBet.toLowerCase()}`,
       prompt: `${streetLabel}. Оппонент ставит ${bet} bb в банк ${pot} bb на обе доски. Ваше действие?`,
       actionLabels: { fold: 'Фолд', call: `Колл ${bet} bb`, raise: `Рейз до ${Math.round(bet * 2.5)} bb` },
       correctAction: correct,
@@ -482,6 +535,7 @@ function genPostflopScenario(holeCount: 4 | 5): OmahaSimScenario {
         `Доска 1 (${street1}) — ваша лучшая комбинация: ${heroHands[0]}.`,
         `Доска 2 (${street2}) — ваша лучшая комбинация: ${heroHands[1]}.`,
         `Пот-оддсы: ${bet} / (${pot} + ${bet} + ${bet}) = ${requiredPct}%.`,
+        `GTO-чарт (${street1}): ${tier.tier} — против ставки: ${tier.facingBet.toLowerCase()}.`,
         'В Омахе комбинация — ровно 2 карты руки + 3 с доски, подсветка показывает их.',
       ],
     }

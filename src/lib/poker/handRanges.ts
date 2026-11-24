@@ -120,15 +120,13 @@ function runTop(sorted: number[]): number {
   return sorted[sorted.length - 1]
 }
 
-// пороги «топ N%» по распределению случайных рук (детерминированная выборка)
-const omahaThresholdCache = new Map<string, number>()
+// распределение оценок случайных стартовых рук (кэшируется, детерминированная выборка)
+const omahaDistCache = new Map<'omaha4' | 'omaha5', Float64Array>()
 
-export function omahaRangeThreshold(game: 'omaha4' | 'omaha5', percent: number): number {
-  if (percent >= 100) return -1
-  const pct = Math.max(1, Math.min(99, percent))
-  const key = `${game}:${pct}`
-  const hit = omahaThresholdCache.get(key)
-  if (hit !== undefined) return hit
+/** Отсортированное по возрастанию распределение оценок 40000 случайных стартовых рук. */
+export function omahaScoreDistribution(game: 'omaha4' | 'omaha5'): Float64Array {
+  const hit = omahaDistCache.get(game)
+  if (hit) return hit
 
   const hc = game === 'omaha4' ? 4 : 5
   const N = 40000
@@ -151,6 +149,21 @@ export function omahaRangeThreshold(game: 'omaha4' | 'omaha5', percent: number):
     scores[i] = ploRangeScore(hand)
   }
   scores.sort()
+  omahaDistCache.set(game, scores)
+  return scores
+}
+
+const omahaThresholdCache = new Map<string, number>()
+
+export function omahaRangeThreshold(game: 'omaha4' | 'omaha5', percent: number): number {
+  if (percent >= 100) return -1
+  const pct = Math.max(1, Math.min(99, percent))
+  const key = `${game}:${pct}`
+  const hit = omahaThresholdCache.get(key)
+  if (hit !== undefined) return hit
+
+  const scores = omahaScoreDistribution(game)
+  const N = scores.length
   // среди уникальных значений выбираем порог с минимальным отклонением доли от целевой
   const target = pct / 100
   let best = scores[0]
@@ -170,6 +183,24 @@ export function omahaRangeThreshold(game: 'omaha4' | 'omaha5', percent: number):
   }
   omahaThresholdCache.set(key, best)
   return best
+}
+
+/**
+ * Место руки среди всех стартовых рук Омахи: «топ X%» (1 — сильнейшая).
+ * Считается как доля рук с оценкой не ниже этой по распределению omahaScoreDistribution.
+ */
+export function omahaHandPercentile(game: 'omaha4' | 'omaha5', hand: Card[]): number {
+  const dist = omahaScoreDistribution(game)
+  const s = ploRangeScore(hand)
+  let lo = 0
+  let hi = dist.length
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1
+    if (dist[mid] < s) lo = mid + 1
+    else hi = mid
+  }
+  const frac = (dist.length - lo) / dist.length
+  return Math.max(1, Math.round(frac * 100))
 }
 
 // ---------- Холдем: классы «топ N%» ----------

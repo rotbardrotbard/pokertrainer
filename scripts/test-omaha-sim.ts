@@ -5,6 +5,8 @@ import { bestOmahaHand } from '../src/lib/poker/omaha'
 import {
   bestOmahaScoreFast, simulateOmahaDouble, analyzePloHand, genOmahaSimScenario,
 } from '../src/lib/poker/omahaSim'
+import { omahaPreflop, omahaAction, omahaEquityTier } from '../src/lib/poker/gto'
+import { omahaHandPercentile, handInRange } from '../src/lib/poker/handRanges'
 
 let failures = 0
 function assert(cond: boolean, msg: string) {
@@ -172,6 +174,8 @@ function hasDuplicates(cards: Card[]): boolean {
       if (s.kind === 'postflop') {
         assert(!hasDuplicates([...s.hero, ...s.boards![0], ...s.boards![1]]), `postflop dup #${t}`)
         assert(s.sim !== null && s.heroHands !== null && s.heroBest !== null, 'postflop fields')
+        assert(s.chart === null && s.handPct === null, 'postflop no chart')
+        assert(s.gtoHint !== null && s.gtoHint.length > 0, 'postflop gtoHint')
         assert(s.boards![0].length >= 3 && s.boards![1].length >= 3, 'board sizes')
         // названия комбинаций пересчитываем независимо
         const n1 = handName(bestOmahaHand(s.hero, s.boards![0]))
@@ -185,18 +189,81 @@ function hasDuplicates(cards: Card[]): boolean {
         assert(s.correctAction === expected, `postflop action match #${t}: ${s.correctAction} vs ${expected}`)
       } else {
         assert(s.boards === null && s.sim === null, 'preflop no boards')
-        const p = s.profile
+        assert(s.chart !== null && s.handPct !== null, `preflop chart fields #${t}`)
+        assert(s.gtoHint === null, 'preflop no gtoHint')
+        assert(s.players >= 2 && s.players <= 9, `table size valid #${t}`)
+        assert(s.handPct! >= 1 && s.handPct! <= 100, `percentile range #${t}`)
+        const game = hc === 4 ? 'omaha4' : 'omaha5'
+        const situation = s.kind === 'open' ? 'open' : 'vsraise'
+        // правильное действие согласовано с GTO-чартом позиции
+        const expected = omahaAction(game, s.hero, s.chart!, situation)
+        assert(s.correctAction === expected, `preflop action match ${s.kind} #${t}`)
+        // чарт соответствует параметрам позиции/стола/ситуации
+        const ref = omahaPreflop(game, s.position, s.players, situation, 0)
         if (s.kind === 'open') {
-          const th = { UTG: 58, MP: 52, CO: 46, BTN: 40, SB: 46 }[s.position as string]!
-          const expected = p.score >= th ? 'raise' : 'fold'
-          assert(s.correctAction === expected, `open action #${t}`)
+          assert(s.chart!.openPercent === ref.openPercent, `open chart matches #${t}`)
+          assert(Math.round(s.chart!.openPercent) !== 0, 'open percent nonzero')
         } else {
-          const expected = p.score >= 62 ? 'raise' : p.score >= 46 ? 'call' : 'fold'
-          assert(s.correctAction === expected, `vsRaise action #${t}`)
+          assert(s.chart!.callPercent === ref.callPercent, `vsraise chart matches #${t}`)
+          assert(s.chart!.threeBetPercent <= s.chart!.callPercent, '3bet tighter than call')
         }
+        // согласованность percentile с диапазоном (допуск на округление)
+        const inRange = s.kind === 'open'
+          ? s.correctAction === 'raise'
+          : s.correctAction !== 'fold'
+        const rangePct = s.kind === 'open' ? s.chart!.openPercent : s.chart!.callPercent
+        if (inRange) assert(s.handPct! <= rangePct + 3, `handPct consistent for in-range #${t}: ${s.handPct} vs ${rangePct}`)
+        else assert(s.handPct! >= rangePct - 3, `handPct consistent for out-of-range #${t}: ${s.handPct} vs ${rangePct}`)
       }
       assert(!hasDuplicates(s.hero) || true, 'hero no dups')
       assert(!hasDuplicates(s.hero), 'hero cards unique')
+    }
+  }
+}
+
+// ---------- 5b. omahaHandPercentile: место руки «топ X%» ----------
+{
+  const aaKK = [pc('Ah'), pc('As'), pc('Kh'), pc('Kd')]
+  const junk = [pc('2h'), pc('7d'), pc('9c'), pc('3s')]
+  const pAA = omahaHandPercentile('omaha4', aaKK)
+  const pJunk = omahaHandPercentile('omaha4', junk)
+  assert(pAA <= 10, `AAKK ds in top 10%, got ${pAA}`)
+  assert(pJunk >= 60, `2379 junk worse than top 60%, got ${pJunk}`)
+  assert(pAA < pJunk, 'stronger hand -> better percentile')
+
+  const pAA5 = omahaHandPercentile('omaha5', [pc('Ah'), pc('Kh'), pc('Qh'), pc('Js'), pc('Ad')])
+  const pJunk5 = omahaHandPercentile('omaha5', [...junk, pc('6d')])
+  assert(pAA5 <= 10, `5-card premium rundown top 10%, got ${pAA5}`)
+  assert(pAA5 < pJunk5, 'omaha5 percentile monotonic')
+  // трипс в руке в 5-card Омахе — «мёртвый вес»: слабее премиум-связки
+  const trips5 = omahaHandPercentile('omaha5', [pc('Ah'), pc('As'), pc('Kh'), pc('Kd'), pc('Kc')])
+  assert(trips5 > pAA5, `AAKKK in hand weaker than premium rundown, got ${trips5} vs ${pAA5}`)
+
+  // согласованность percentile с handInRange на случайной выборке (допуск на округление)
+  for (let t = 0; t < 300; t++) {
+    const deck = shuffle(fullDeck())
+    const hand = deck.slice(0, 4)
+    const pct = omahaHandPercentile('omaha4', hand)
+    for (const rp of [10, 30, 50]) {
+      const inRange = handInRange('omaha4', hand, rp)
+      if (inRange) assert(pct <= rp + 3, `in-range ${rp}% but pct ${pct}`)
+      else assert(pct >= rp - 3, `out-of-range ${rp}% but pct ${pct}`)
+    }
+  }
+  console.log(`Percentile: AAKK ds → топ ${pAA}%, junk 2379 → топ ${pJunk}% (omaha4); 5-card: ${pAA5}% / ${pJunk5}%`)
+}
+
+// ---------- 5c. omahaEquityTier: тиры постфлоп-чарта ----------
+{
+  for (const game of ['omaha4', 'omaha5'] as const) {
+    for (const street of ['flop', 'turn', 'river'] as const) {
+      const tRaise = omahaEquityTier(game, street, 'raise')
+      const tCall = omahaEquityTier(game, street, 'call')
+      const tFold = omahaEquityTier(game, street, 'fold')
+      assert(tRaise.action === 'bet', `${game}:${street} raise tier = bet`)
+      assert(tCall.action === 'call', `${game}:${street} call tier = call`)
+      assert(tFold.action === 'fold', `${game}:${street} fold tier = fold`)
+      assert(tRaise.tier.length > 0 && tCall.tier.length > 0 && tFold.tier.length > 0, 'tiers have titles')
     }
   }
 }

@@ -14,9 +14,11 @@ import { OmahaSimView } from '@/components/poker/OmahaSimView'
 import { RangesView } from '@/components/poker/RangesView'
 import { CalculatorView } from '@/components/poker/CalculatorView'
 import { GtoView } from '@/components/poker/GtoView'
+import type { GtoInitial } from '@/components/poker/GtoView'
 
 export default function Home() {
   const [view, setView] = useState<ViewId>('home')
+  const [gtoInit, setGtoInit] = useState<GtoInitial | null>(null)
 
   // прокрутка вверх при смене экрана
   useEffect(() => {
@@ -25,6 +27,12 @@ export default function Home() {
 
   function back() {
     setView('home')
+  }
+
+  // переход в GTO-чарты с предустановкой из симулятора раздач
+  function openGto(init: GtoInitial) {
+    setGtoInit(init)
+    setView('gto')
   }
 
   switch (view) {
@@ -47,13 +55,13 @@ export default function Home() {
     case 'omaha5':
       return <OmahaTrainerView variant="double5" onBack={back} />
     case 'omaha4sim':
-      return <OmahaSimView variant="double4" onBack={back} />
+      return <OmahaSimView variant="double4" onBack={back} onOpenGto={openGto} />
     case 'omaha5sim':
-      return <OmahaSimView variant="double5" onBack={back} />
+      return <OmahaSimView variant="double5" onBack={back} onOpenGto={openGto} />
     case 'ranges':
       return <RangesView onBack={back} />
     case 'gto':
-      return <GtoView onBack={back} />
+      return <GtoView onBack={back} initial={gtoInit} />
     case 'calculator':
       return <CalculatorView onBack={back} />
     default:

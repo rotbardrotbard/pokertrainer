@@ -435,6 +435,18 @@ export function postflopGuide(game: GameKind, street: Exclude<Street, 'preflop'>
   }
 }
 
+/**
+ * Ориентир из GTO-чарта для Омахи по вердикту решения:
+ * raise → верхний тир (натсы), call → средний, fold → нижний.
+ * Используется симулятором раздач для связи с разделом GTO.
+ */
+export function omahaEquityTier(game: 'omaha4' | 'omaha5', street: Exclude<Street, 'preflop'>, verdict: 'raise' | 'call' | 'fold'): PostflopTier {
+  const tiers = GUIDES[`${game}:${street}`] ?? OMAHA_FLOP
+  if (verdict === 'raise') return tiers[0]
+  if (verdict === 'call') return tiers[1]
+  return tiers[tiers.length - 1]
+}
+
 // ---------- Префлоп: текстовые принципы ----------
 
 export function preflopNotes(game: GameKind, pos: Position, situation: 'open' | 'vsraise', callers: number): string[] {
