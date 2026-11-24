@@ -35,7 +35,7 @@ export function EvTrainerView({ onBack }: { onBack: () => void }) {
             <li>EV(колл) = эквити × (банк + ставка) − (1 − эквити) × колл</li>
             <li>Порог: эквити &gt; колл / (банк + 2 × колл)</li>
           </ul>
-          <Button onClick={next} className="bg-amber-500 text-stone-950 hover:bg-amber-400 font-semibold">
+          <Button onClick={next} className="bg-emerald-600 text-white hover:bg-emerald-500">
             Начать сессию
           </Button>
         </ScenarioCard>
@@ -51,7 +51,7 @@ export function EvTrainerView({ onBack }: { onBack: () => void }) {
           Банк — {question.pot} bb. Оппонент ставит {question.bet} bb.
         </p>
         <p className="text-sm text-stone-300">
-          Ваше эквити против диапазона оппонента: <b className="text-amber-400">{question.equityPct}%</b>
+          Ваше эквити против диапазона оппонента: <b className="text-stone-100">{question.equityPct}%</b>
         </p>
         {!answered && (
           <div className="flex gap-2">
@@ -62,7 +62,7 @@ export function EvTrainerView({ onBack }: { onBack: () => void }) {
             >
               Фолд
             </Button>
-            <Button onClick={() => answer('call')} className="bg-emerald-600 text-white hover:bg-emerald-500 font-semibold">
+            <Button onClick={() => answer('call')} className="bg-emerald-600 text-white hover:bg-emerald-500">
               Колл {question.bet} bb
             </Button>
           </div>

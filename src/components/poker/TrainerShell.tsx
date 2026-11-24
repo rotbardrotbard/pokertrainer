@@ -29,7 +29,7 @@ export function TrainerShell({ title, subtitle, trainerId, onBack, children }: T
           <ArrowLeft className="w-4 h-4" /> Меню
         </Button>
         <div className="flex items-center gap-3 text-xs">
-          <span className="flex items-center gap-1 text-amber-400">
+          <span className="flex items-center gap-1 text-emerald-400">
             <Target className="w-3.5 h-3.5" />
             Сессия: {session === null ? '—' : `${session}%`}
           </span>
@@ -41,7 +41,7 @@ export function TrainerShell({ title, subtitle, trainerId, onBack, children }: T
       </div>
 
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-amber-400">{title}</h1>
+        <h1 className="text-xl sm:text-2xl font-light text-stone-50">{title}</h1>
         <p className="text-sm text-stone-400">{subtitle}</p>
       </div>
 
@@ -66,7 +66,7 @@ export function Feedback({ correct, headline, explanation, detail, onNext, nextL
       correct ? 'border-emerald-600/60 bg-emerald-950/30' : 'border-red-600/60 bg-red-950/30',
     )}>
       <CardContent className="p-4 sm:p-5 flex flex-col gap-3">
-        <div className={cn('flex items-center gap-2 font-bold text-base', correct ? 'text-emerald-400' : 'text-red-400')}>
+        <div className={cn('flex items-center gap-2 font-normal text-base', correct ? 'text-emerald-400' : 'text-red-400')}>
           {correct ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
           {headline}
         </div>
@@ -76,7 +76,7 @@ export function Feedback({ correct, headline, explanation, detail, onNext, nextL
             {detail.map((d, i) => <li key={i}>{d}</li>)}
           </ul>
         )}
-        <Button onClick={onNext} className="bg-amber-500 text-stone-950 hover:bg-amber-400 font-semibold mt-1">
+        <Button onClick={onNext} className="bg-emerald-600 text-white hover:bg-emerald-500 mt-1">
           <RotateCcw className="w-4 h-4" /> {nextLabel}
         </Button>
       </CardContent>

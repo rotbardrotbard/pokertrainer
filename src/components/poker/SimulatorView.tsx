@@ -36,7 +36,7 @@ export function SimulatorView({ onBack }: { onBack: () => void }) {
             Тренируйте решения на префлопе и постфлопе: открытие рейза, защита против рейза, коллы по пот-оддсам.
             После каждого ответа — подробный разбор с эквити и диапазонами.
           </p>
-          <Button onClick={next} className="bg-amber-500 text-stone-950 hover:bg-amber-400 font-semibold">
+          <Button onClick={next} className="bg-emerald-600 text-white hover:bg-emerald-500">
             Начать сессию
           </Button>
         </ScenarioCard>
@@ -51,7 +51,7 @@ export function SimulatorView({ onBack }: { onBack: () => void }) {
     <TrainerShell title="Симулятор раздач" subtitle="Принимайте решения, как за реальным столом" trainerId="sim" onBack={onBack}>
       <ScenarioCard>
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          <Badge variant="outline" className="border-amber-500/50 text-amber-400">
+          <Badge variant="outline" className="border-emerald-500/50 text-emerald-400">
             {scenario.kind === 'open' ? 'Префлоп · открытие' : scenario.kind === 'vsRaise' ? 'Префлоп · против рейза' : 'Постфлоп'}
           </Badge>
           {scenario.kind !== 'postflop' && (
@@ -75,8 +75,8 @@ export function SimulatorView({ onBack }: { onBack: () => void }) {
         </div>
 
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-stone-300">
-          <span>Банк: <b className="text-amber-400">{scenario.pot} bb</b></span>
-          {scenario.bet > 0 && <span>Нужно уравнять: <b className="text-amber-400">{scenario.bet} bb</b></span>}
+          <span>Банк: <b className="text-stone-100">{scenario.pot} bb</b></span>
+          {scenario.bet > 0 && <span>Нужно уравнять: <b className="text-stone-100">{scenario.bet} bb</b></span>}
           <span>Стек: <b>{scenario.stack} bb</b></span>
         </div>
 
@@ -100,7 +100,7 @@ export function SimulatorView({ onBack }: { onBack: () => void }) {
                 {scenario.actionLabels.call}
               </Button>
             )}
-            <Button onClick={() => answer('raise')} className="bg-amber-500 text-stone-950 hover:bg-amber-400 font-semibold">
+            <Button onClick={() => answer('raise')} className="bg-emerald-600 text-white hover:bg-emerald-500">
               {scenario.actionLabels.raise}
             </Button>
           </div>

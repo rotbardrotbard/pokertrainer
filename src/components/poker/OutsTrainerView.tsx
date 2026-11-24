@@ -44,7 +44,7 @@ export function OutsTrainerView({ onBack }: { onBack: () => void }) {
             <li>Гатшот (внутренний стрит-дро): 4 аутса</li>
             <li>Правило 2 и 4: аутсы × 2 на следующей улице, × 4 на двух улицах</li>
           </ul>
-          <Button onClick={next} className="bg-amber-500 text-stone-950 hover:bg-amber-400 font-semibold">
+          <Button onClick={next} className="bg-emerald-600 text-white hover:bg-emerald-500">
             Начать сессию
           </Button>
         </ScenarioCard>
@@ -88,7 +88,7 @@ export function OutsTrainerView({ onBack }: { onBack: () => void }) {
             className="w-32 bg-stone-900 border-stone-700 text-stone-100"
             aria-label="Количество аутсов"
           />
-          <Button onClick={submit} disabled={answeredCorrect !== null || answer.trim() === ''} className="bg-amber-500 text-stone-950 hover:bg-amber-400 font-semibold">
+          <Button onClick={submit} disabled={answeredCorrect !== null || answer.trim() === ''} className="bg-emerald-600 text-white hover:bg-emerald-500">
             Ответить
           </Button>
         </div>

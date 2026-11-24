@@ -9,7 +9,7 @@ import {
   rangePercent, topPercentClasses, POSITION_NAMES_RU, classesToCombos,
 } from './ranges'
 
-const rand = () => Math.random
+const rand: () => number = Math.random
 const ri = (n: number) => Math.floor(Math.random() * n)
 const pick = <T,>(arr: T[]): T => arr[ri(arr.length)]
 

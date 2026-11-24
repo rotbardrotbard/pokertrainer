@@ -15,8 +15,8 @@ export function classFor(row: number, col: number): string {
 export type RangeCellAction = 'raise' | 'call' | 'fold'
 
 const actionStyles: Record<RangeCellAction, string> = {
-  raise: 'bg-amber-500/90 text-stone-900',
-  call: 'bg-emerald-600/90 text-stone-50',
+  raise: 'bg-emerald-500/90 text-stone-950',
+  call: 'bg-sky-700/90 text-stone-50',
   fold: 'bg-stone-800/70 text-stone-500',
 }
 
@@ -42,7 +42,7 @@ export function RangeGrid({
                 onClick={() => setSelected(cls)}
                 className={cn(
                   cellSize,
-                  'aspect-square flex items-center justify-center font-semibold leading-none min-w-0 hover:brightness-110 transition cursor-pointer',
+                  'aspect-square flex items-center justify-center font-normal leading-none min-w-0 hover:brightness-110 transition cursor-pointer',
                   actionStyles[action],
                   selected === cls && 'ring-2 ring-white z-10',
                 )}
@@ -58,7 +58,7 @@ export function RangeGrid({
       <div className="text-xs text-stone-400 min-h-4">
         {selected ? (
           <span>
-            <span className="font-bold text-stone-100">{selected}</span> — {actionLabel(getAction(selected))}
+            <span className="font-normal text-stone-100">{selected}</span> — {actionLabel(getAction(selected))}
           </span>
         ) : (
           <span>Нажмите на руку, чтобы увидеть действие</span>
@@ -80,10 +80,10 @@ export function RangeLegend() {
   return (
     <div className="flex flex-wrap gap-3 text-xs">
       <span className="flex items-center gap-1.5">
-        <span className="w-3.5 h-3.5 rounded-sm bg-amber-500/90 inline-block" /> Рейз
+        <span className="w-3.5 h-3.5 rounded-sm bg-emerald-500/90 inline-block" /> Рейз
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="w-3.5 h-3.5 rounded-sm bg-emerald-600/90 inline-block" /> Колл
+        <span className="w-3.5 h-3.5 rounded-sm bg-sky-700/90 inline-block" /> Колл
       </span>
       <span className="flex items-center gap-1.5">
         <span className="w-3.5 h-3.5 rounded-sm bg-stone-800/70 border border-stone-700 inline-block" /> Фолд

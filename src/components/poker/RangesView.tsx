@@ -43,7 +43,7 @@ export function RangesView({ onBack }: { onBack: () => void }) {
             size="sm"
             variant={pos === p ? 'default' : 'outline'}
             onClick={() => setPos(p)}
-            className={pos === p ? 'bg-amber-500 text-stone-950 hover:bg-amber-400 font-semibold' : 'border-stone-600 bg-stone-800/60 text-stone-200 hover:bg-stone-700'}
+            className={pos === p ? 'bg-emerald-600 text-white hover:bg-emerald-500' : 'border-stone-600 bg-stone-800/60 text-stone-200 hover:bg-stone-700'}
           >
             {p}
           </Button>
@@ -54,7 +54,7 @@ export function RangesView({ onBack }: { onBack: () => void }) {
           size="sm"
           variant={mode === 'open' ? 'default' : 'outline'}
           onClick={() => setMode('open')}
-          className={mode === 'open' ? 'bg-amber-500 text-stone-950 hover:bg-amber-400 font-semibold' : 'border-stone-600 bg-stone-800/60 text-stone-200'}
+          className={mode === 'open' ? 'bg-emerald-600 text-white hover:bg-emerald-500' : 'border-stone-600 bg-stone-800/60 text-stone-200'}
         >
           Открытие
         </Button>
@@ -62,7 +62,7 @@ export function RangesView({ onBack }: { onBack: () => void }) {
           size="sm"
           variant={mode === 'vsRaise' ? 'default' : 'outline'}
           onClick={() => setMode('vsRaise')}
-          className={mode === 'vsRaise' ? 'bg-amber-500 text-stone-950 hover:bg-amber-400 font-semibold' : 'border-stone-600 bg-stone-800/60 text-stone-200'}
+          className={mode === 'vsRaise' ? 'bg-emerald-600 text-white hover:bg-emerald-500' : 'border-stone-600 bg-stone-800/60 text-stone-200'}
         >
           Против рейза
         </Button>
@@ -71,7 +71,7 @@ export function RangesView({ onBack }: { onBack: () => void }) {
       <ScenarioCard>
         <div className="flex flex-col gap-3">
           <div>
-            <h2 className="text-base font-bold text-stone-100">
+            <h2 className="text-base font-normal text-stone-100">
               {mode === 'open'
                 ? `Открытие рейза с ${POSITION_NAMES_RU[pos]}`
                 : `Защита ${POSITION_NAMES_RU[pos]} против рейза`}

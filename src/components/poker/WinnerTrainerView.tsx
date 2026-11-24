@@ -36,7 +36,7 @@ export function WinnerTrainerView({ onBack }: { onBack: () => void }) {
             <li>Из 7 карт (2 ваши + 5 доски) составляется лучшая 5-карточная комбинация</li>
             <li>Если лучшие комбинации равны — банк делится (сплит)</li>
           </ul>
-          <Button onClick={next} className="bg-amber-500 text-stone-950 hover:bg-amber-400 font-semibold">
+          <Button onClick={next} className="bg-emerald-600 text-white hover:bg-emerald-500">
             Начать сессию
           </Button>
         </ScenarioCard>
@@ -68,7 +68,7 @@ export function WinnerTrainerView({ onBack }: { onBack: () => void }) {
         <p className="text-sm text-stone-100 font-medium">Кто побеждает в этой раздаче?</p>
         {!answered && (
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => answer('hero')} className="bg-emerald-600 text-white hover:bg-emerald-500 font-semibold">
+            <Button onClick={() => answer('hero')} className="bg-emerald-600 text-white hover:bg-emerald-500">
               Игрок 1 (вы)
             </Button>
             <Button variant="outline" onClick={() => answer('tie')} className="border-stone-600 bg-stone-800/60 text-stone-100 hover:bg-stone-700">

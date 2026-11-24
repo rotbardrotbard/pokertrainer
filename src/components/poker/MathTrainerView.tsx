@@ -42,7 +42,7 @@ export function MathTrainerView({ onBack }: { onBack: () => void }) {
             <li>Шансы банка a:1 → нужно 1 / (a + 1)</li>
             <li>Ответ принимается с точностью ±1.5%</li>
           </ul>
-          <Button onClick={next} className="bg-amber-500 text-stone-950 hover:bg-amber-400 font-semibold">
+          <Button onClick={next} className="bg-emerald-600 text-white hover:bg-emerald-500">
             Начать сессию
           </Button>
         </ScenarioCard>
@@ -66,7 +66,7 @@ export function MathTrainerView({ onBack }: { onBack: () => void }) {
             aria-label="Ваш ответ в процентах"
           />
           <span className="text-stone-400 text-sm">%</span>
-          <Button onClick={submit} disabled={answeredCorrect !== null || answer.trim() === ''} className="bg-amber-500 text-stone-950 hover:bg-amber-400 font-semibold">
+          <Button onClick={submit} disabled={answeredCorrect !== null || answer.trim() === ''} className="bg-emerald-600 text-white hover:bg-emerald-500">
             Ответить
           </Button>
         </div>

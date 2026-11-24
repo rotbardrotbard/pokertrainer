@@ -2,7 +2,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export type TrainerId = 'sim' | 'math' | 'outs' | 'ev' | 'winner' | 'combo'
+export type TrainerId = 'sim' | 'math' | 'outs' | 'ev' | 'winner' | 'combo' | 'omaha' | 'omaha4' | 'omaha5'
 
 export interface TrainerStats {
   attempts: number
@@ -29,6 +29,9 @@ function emptyStats(): Record<TrainerId, TrainerStats> {
     ev: { attempts: 0, correct: 0, sessionAttempts: 0, sessionCorrect: 0 },
     winner: { attempts: 0, correct: 0, sessionAttempts: 0, sessionCorrect: 0 },
     combo: { attempts: 0, correct: 0, sessionAttempts: 0, sessionCorrect: 0 },
+    omaha: { attempts: 0, correct: 0, sessionAttempts: 0, sessionCorrect: 0 },
+    omaha4: { attempts: 0, correct: 0, sessionAttempts: 0, sessionCorrect: 0 },
+    omaha5: { attempts: 0, correct: 0, sessionAttempts: 0, sessionCorrect: 0 },
   }
 }
 
@@ -52,7 +55,8 @@ export const useStats = create<StatsState>()(
       lastPlayedDate: null,
       recordAnswer: (trainer, correct) => {
         const s = get()
-        const t = s.stats[trainer]
+        // защита от старых сохранений без новых режимов
+        const t = s.stats[trainer] ?? { attempts: 0, correct: 0, sessionAttempts: 0, sessionCorrect: 0 }
         const today = todayStr()
         let streak = s.streak
         let bestStreak = s.bestStreak
@@ -78,14 +82,25 @@ export const useStats = create<StatsState>()(
       },
       resetSession: (trainer) => {
         const s = get()
-        const t = s.stats[trainer]
+        const t = s.stats[trainer] ?? { attempts: 0, correct: 0, sessionAttempts: 0, sessionCorrect: 0 }
         set({
           stats: { ...s.stats, [trainer]: { ...t, sessionAttempts: 0, sessionCorrect: 0 } },
         })
       },
       resetAll: () => set({ stats: emptyStats(), streak: 0, lastPlayedDate: null }),
     }),
-    { name: 'poker-trainer-stats' },
+    {
+      name: 'poker-trainer-stats',
+      // мержим сохранение с актуальной схемой, чтобы новые режимы не ломали старые данные
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<StatsState>
+        const merged = emptyStats()
+        for (const k of Object.keys(merged) as TrainerId[]) {
+          merged[k] = { ...merged[k], ...(p.stats?.[k] ?? {}) }
+        }
+        return { ...current, ...p, stats: merged }
+      },
+    },
   ),
 )
 

@@ -137,8 +137,8 @@ export function CalculatorView({ onBack }: { onBack: () => void }) {
               type="button"
               onClick={() => setOpponents(n)}
               className={cn(
-                'w-8 h-8 rounded-md text-sm font-semibold transition',
-                opponents === n ? 'bg-amber-500 text-stone-950' : 'bg-stone-800 text-stone-300 hover:bg-stone-700',
+                'w-8 h-8 rounded-md text-sm font-normal transition',
+                opponents === n ? 'bg-emerald-600 text-white' : 'bg-stone-800 text-stone-300 hover:bg-stone-700',
               )}
             >
               {n}
@@ -162,7 +162,7 @@ export function CalculatorView({ onBack }: { onBack: () => void }) {
                     disabled={used}
                     onClick={() => pickCard(card)}
                     className={cn(
-                      'w-9 h-9 rounded-md text-sm font-semibold border transition shrink-0',
+                      'w-9 h-9 rounded-md text-sm font-normal border transition shrink-0',
                       used
                         ? 'bg-stone-900/40 border-stone-800 text-stone-600 line-through cursor-not-allowed'
                         : (s === 1 || s === 2)
@@ -185,7 +185,7 @@ export function CalculatorView({ onBack }: { onBack: () => void }) {
         </p>
 
         <div className="flex gap-2">
-          <Button onClick={run} disabled={!canCompute || sim.running} className="bg-amber-500 text-stone-950 hover:bg-amber-400 font-semibold">
+          <Button onClick={run} disabled={!canCompute || sim.running} className="bg-emerald-600 text-white hover:bg-emerald-500">
             {sim.running ? `Расчёт… ${Math.round(sim.progress)}%` : 'Рассчитать эквити'}
           </Button>
           <Button
@@ -202,34 +202,36 @@ export function CalculatorView({ onBack }: { onBack: () => void }) {
         </div>
 
         {!canCompute && (
-          <p className="text-xs text-amber-500/80">Выберите минимум 2 карты героя. Доска: пусто, или 3–5 карт.</p>
+          <p className="text-xs text-stone-400">Выберите минимум 2 карты героя. Доска: пусто, или 3–5 карт.</p>
         )}
       </ScenarioCard>
 
-      {sim.result && (
+      {sim.result && (() => {
+        const result = sim.result
+        return (
         <Card className="border-stone-800 bg-emerald-950/40">
           <CardContent className="p-4 sm:p-6 flex flex-col gap-4">
             <div className="flex items-baseline gap-3">
-              <span className="text-4xl sm:text-5xl font-bold text-emerald-400">
-                {(sim.result.win * 100).toFixed(1)}%
+              <span className="text-4xl sm:text-5xl font-light text-emerald-400">
+                {(result.win * 100).toFixed(1)}%
               </span>
-              <span className="text-sm text-stone-400">шанс победы ({sim.result.iterations.toLocaleString('ru-RU')} симуляций)</span>
+              <span className="text-sm text-stone-400">шанс победы ({result.iterations.toLocaleString('ru-RU')} симуляций)</span>
             </div>
             <div className="h-3 w-full rounded-full overflow-hidden bg-stone-800 flex">
-              <div className="bg-emerald-500 h-full" style={{ width: `${sim.result.win * 100}%` }} />
-              <div className="bg-amber-500 h-full" style={{ width: `${sim.result.tie * 100}%` }} />
-              <div className="bg-red-800 h-full" style={{ width: `${sim.result.lose * 100}%` }} />
+              <div className="bg-emerald-500 h-full" style={{ width: `${result.win * 100}%` }} />
+              <div className="bg-stone-500 h-full" style={{ width: `${result.tie * 100}%` }} />
+              <div className="bg-red-800 h-full" style={{ width: `${result.lose * 100}%` }} />
             </div>
             <div className="flex gap-4 text-xs text-stone-300">
-              <span>Победа: {(sim.result.win * 100).toFixed(1)}%</span>
-              <span>Ничья: {(sim.result.tie * 100).toFixed(1)}%</span>
-              <span>Поражение: {(sim.result.lose * 100).toFixed(1)}%</span>
+              <span>Победа: {(result.win * 100).toFixed(1)}%</span>
+              <span>Ничья: {(result.tie * 100).toFixed(1)}%</span>
+              <span>Поражение: {(result.lose * 100).toFixed(1)}%</span>
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-stone-200 mb-2">Финальные комбинации героя:</h3>
+              <h3 className="text-sm font-normal text-stone-200 mb-2">Финальные комбинации героя:</h3>
               <div className="flex flex-col gap-1">
-                {sim.result.heroCats
-                  .map((cnt, cat) => ({ cat, pct: (cnt / sim.result.iterations) * 100 }))
+                {result.heroCats
+                  .map((cnt, cat) => ({ cat, pct: (cnt / result.iterations) * 100 }))
                   .filter((x) => x.pct > 0.05)
                   .sort((a, b) => b.pct - a.pct)
                   .slice(0, 6)
@@ -237,7 +239,7 @@ export function CalculatorView({ onBack }: { onBack: () => void }) {
                     <div key={x.cat} className="flex items-center gap-2 text-xs">
                       <span className="w-28 text-stone-400">{handCategoryName(x.cat)}</span>
                       <div className="flex-1 h-2 bg-stone-800 rounded-full overflow-hidden">
-                        <div className="bg-amber-500/80 h-full" style={{ width: `${Math.min(100, x.pct)}%` }} />
+                        <div className="bg-emerald-500/80 h-full" style={{ width: `${Math.min(100, x.pct)}%` }} />
                       </div>
                       <span className="w-12 text-right text-stone-300">{x.pct.toFixed(1)}%</span>
                     </div>
@@ -246,7 +248,8 @@ export function CalculatorView({ onBack }: { onBack: () => void }) {
             </div>
           </CardContent>
         </Card>
-      )}
+        )
+      })()}
     </TrainerShell>
   )
 }
@@ -277,7 +280,7 @@ function SlotRow({
             onClick={() => (cards[id] ? onClear(id) : onSelect(id))}
             className={cn(
               'rounded-lg transition',
-              activeSlot === id && 'ring-2 ring-amber-400 ring-offset-1 ring-offset-emerald-950',
+              activeSlot === id && 'ring-2 ring-emerald-400 ring-offset-1 ring-offset-emerald-950',
             )}
             aria-label={cards[id] ? 'Очистить слот' : 'Выбрать слот'}
           >

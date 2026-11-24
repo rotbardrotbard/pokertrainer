@@ -9,6 +9,7 @@ import { OutsTrainerView } from '@/components/poker/OutsTrainerView'
 import { EvTrainerView } from '@/components/poker/EvTrainerView'
 import { WinnerTrainerView } from '@/components/poker/WinnerTrainerView'
 import { ComboTrainerView } from '@/components/poker/ComboTrainerView'
+import { OmahaTrainerView } from '@/components/poker/OmahaTrainerView'
 import { RangesView } from '@/components/poker/RangesView'
 import { CalculatorView } from '@/components/poker/CalculatorView'
 
@@ -37,6 +38,12 @@ export default function Home() {
       return <WinnerTrainerView onBack={back} />
     case 'combo':
       return <ComboTrainerView onBack={back} />
+    case 'omaha':
+      return <OmahaTrainerView variant="classic" onBack={back} />
+    case 'omaha4':
+      return <OmahaTrainerView variant="double4" onBack={back} />
+    case 'omaha5':
+      return <OmahaTrainerView variant="double5" onBack={back} />
     case 'ranges':
       return <RangesView onBack={back} />
     case 'calculator':

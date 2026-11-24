@@ -41,7 +41,7 @@ export function PlayingCard({ card, faceDown, size = 'md', highlighted, dimmed, 
         sizeClasses[size],
         'bg-gradient-to-br from-stone-50 to-stone-200 border border-stone-300 shadow-md relative flex flex-col items-center justify-center select-none transition-transform',
         isRed ? 'text-red-600' : 'text-stone-900',
-        highlighted && 'ring-2 ring-amber-400 ring-offset-1 ring-offset-emerald-950 scale-105 z-10',
+        highlighted && 'ring-2 ring-emerald-400 ring-offset-1 ring-offset-emerald-950 scale-105 z-10',
         dimmed && 'opacity-40',
         className,
       )}

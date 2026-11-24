@@ -36,7 +36,7 @@ export function ComboTrainerView({ onBack }: { onBack: () => void }) {
             <li>Иерархия: старшая карта → пара → две пары → сет → стрит → флеш → фулл-хаус → каре → стрит-флеш</li>
             <li>Из 7 карт всегда берутся только лучшие 5</li>
           </ul>
-          <Button onClick={next} className="bg-amber-500 text-stone-950 hover:bg-amber-400 font-semibold">
+          <Button onClick={next} className="bg-emerald-600 text-white hover:bg-emerald-500">
             Начать сессию
           </Button>
         </ScenarioCard>
