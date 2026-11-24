@@ -176,7 +176,11 @@ function hasDuplicates(cards: Card[]): boolean {
         assert(s.sim !== null && s.heroHands !== null && s.heroBest !== null, 'postflop fields')
         assert(s.chart === null && s.handPct === null, 'postflop no chart')
         assert(s.gtoHint !== null && s.gtoHint.length > 0, 'postflop gtoHint')
-        assert(s.boards![0].length >= 3 && s.boards![1].length >= 3, 'board sizes')
+        // обе доски на одной улице: открываются синхронно (2 флопа, затем 2 терна)
+        assert(
+          s.boards![0].length === s.boards![1].length && s.boards![0].length >= 3 && s.boards![0].length <= 5,
+          `boards same street #${t}: ${s.boards![0].length} vs ${s.boards![1].length}`,
+        )
         // названия комбинаций пересчитываем независимо
         const n1 = handName(bestOmahaHand(s.hero, s.boards![0]))
         const n2 = handName(bestOmahaHand(s.hero, s.boards![1]))

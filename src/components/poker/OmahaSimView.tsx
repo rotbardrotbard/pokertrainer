@@ -62,8 +62,8 @@ function boardStreetLabel(n: number): string {
 function gtoInitFor(scenario: OmahaSimScenario): GtoInitial {
   const game: GameKind = scenario.holeCount === 4 ? 'omaha4' : 'omaha5'
   if (scenario.kind === 'postflop') {
-    const [n1, n2] = scenario.boardStreets!
-    const street: Street = n1 === n2 ? (n1 === 3 ? 'flop' : 'turn') : 'flop'
+    // Обе доски на одной улице (открываются синхронно)
+    const street: Street = scenario.boardStreet === 3 ? 'flop' : 'turn'
     return { game, street, seat: 'BB', opponents: 1 }
   }
   return {
@@ -318,7 +318,7 @@ export function OmahaSimView({ variant, onBack, onOpenGto }: { variant: DoubleVa
           {isPostflop && scenario.gtoHint && (
             <GtoPostflopPanel
               scenario={scenario}
-              streetLabel={boardStreetLabel(scenario.boardStreets![0])}
+              streetLabel={boardStreetLabel(scenario.boardStreet)}
               onOpenGto={onOpenGto}
             />
           )}
