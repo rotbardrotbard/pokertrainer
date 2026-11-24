@@ -99,11 +99,12 @@ function refOmahaScore(hole: Card[], board: Card[]): number {
 
 // ---------- 3. simulateOmahaDouble: детерминированные случаи ----------
 {
-  // Непобедимые руки: натсовые стрит-флеши на обоих бордах (As Ts и Ad Kd в руке,
-  // вилл не может собрать выше — As/Ts и Ad/Kd блокированы героем)
+  // Непобедимые руки: натсовый роял на доске 1 (As Ts + Ks Qs Js),
+  // на доске 2 — A-флеш (Ad Kd + Qd 2d 7d): тузы/короли пик и бубен блокированы героем,
+  // стрит-флеш на доске 2 невозможен (нет 3 подряд бубён в сочетании с 2 картами вилла)
   const hero = [pc('As'), pc('Ts'), pc('Ad'), pc('Kd')]
   const b1 = [pc('Ks'), pc('Qs'), pc('Js'), pc('2s'), pc('3d')]
-  const b2 = [pc('Kd'), pc('Qd'), pc('Jd'), pc('2d'), pc('3c')]
+  const b2 = [pc('Kd'), pc('Qd'), pc('2d'), pc('7d'), pc('3c')]
   const eq = simulateOmahaDouble({ hero, boards: [b1, b2], holeCount: 4, iterations: 400 })
   assert(eq.eq1 === 1 && eq.eq2 === 1, `nut SF on both boards = 100%, got ${eq.eq1}/${eq.eq2}`)
   assert(eq.total === 1, 'total = 1')

@@ -13,6 +13,7 @@ import { OmahaTrainerView } from '@/components/poker/OmahaTrainerView'
 import { OmahaSimView } from '@/components/poker/OmahaSimView'
 import { RangesView } from '@/components/poker/RangesView'
 import { CalculatorView } from '@/components/poker/CalculatorView'
+import { GtoView } from '@/components/poker/GtoView'
 
 export default function Home() {
   const [view, setView] = useState<ViewId>('home')
@@ -51,6 +52,8 @@ export default function Home() {
       return <OmahaSimView variant="double5" onBack={back} />
     case 'ranges':
       return <RangesView onBack={back} />
+    case 'gto':
+      return <GtoView onBack={back} />
     case 'calculator':
       return <CalculatorView onBack={back} />
     default:

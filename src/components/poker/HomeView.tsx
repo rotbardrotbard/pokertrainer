@@ -1,14 +1,14 @@
 'use client'
 
 // Главная: режимы тренировки, статистика, серия дней
-import { Flame, Zap, Sigma, Target, Percent, Swords, Layers, Grid3x3, Calculator, Trophy, ShieldCheck, Spade, Copy, SquareStack, Shuffle, Dices } from 'lucide-react'
+import { Flame, Zap, Sigma, Target, Percent, Swords, Layers, Grid3x3, Calculator, Trophy, ShieldCheck, Spade, Copy, SquareStack, Shuffle, Dices, Compass } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { TrainerId, useStats, accuracy } from '@/store/stats'
 import { PlayingCard, CardRow } from './PlayingCard'
 import { parseCard } from '@/lib/poker/cards'
 import { cn } from '@/lib/utils'
 
-export type ViewId = TrainerId | 'ranges' | 'calculator' | 'home'
+export type ViewId = TrainerId | 'ranges' | 'calculator' | 'gto' | 'home'
 
 interface ModeCard {
   id: ViewId
@@ -31,7 +31,8 @@ const MODES: ModeCard[] = [
   { id: 'omaha4sim', title: 'Симулятор · 4-card Омаха (2 доски)', desc: 'Раздачи на двух бордах: фолд, колл или рейз — с разбором', icon: Shuffle, trainer: 'omaha4sim' },
   { id: 'omaha5sim', title: 'Симулятор · 5-card Омаха (2 доски)', desc: 'Раздачи с пятью картами руки и эквити обеих досок', icon: Dices, trainer: 'omaha5sim' },
   { id: 'ranges', title: 'Диапазоны префлоп', desc: 'Чарты 6-max по позициям', icon: Grid3x3 },
-  { id: 'calculator', title: 'Калькулятор эквити', desc: 'Monte Carlo против любых рук', icon: Calculator },
+  { id: 'gto', title: 'GTO-чарты', desc: 'Стол, позиция, соперники и раунд: что играть, что сбрасывать', icon: Compass },
+  { id: 'calculator', title: 'Калькулятор эквити', desc: 'Холдем и Омаха: до 8 оппонентов и выбор диапазонов', icon: Calculator },
 ]
 
 export function HomeView({ onSelect }: { onSelect: (v: ViewId) => void }) {
