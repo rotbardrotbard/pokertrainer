@@ -119,7 +119,7 @@ export function CalculatorView({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <TrainerShell title="Калькулятор эквити" subtitle="Вероятность победы против случайных рук или конкретного оппонента" onBack={onBack}>
+    <TrainerShell title="Калькулятор эквити" subtitle="Против случайных рук (до 8 оппонентов) или конкретного оппонента" onBack={onBack}>
       <ScenarioCard>
         {/* Слоты */}
         <div className="flex flex-col gap-3">
@@ -129,9 +129,9 @@ export function CalculatorView({ onBack }: { onBack: () => void }) {
         </div>
 
         {/* Выбор оппонентов */}
-        <div className="flex items-center gap-2 text-sm text-stone-300">
+        <div className="flex flex-wrap items-center gap-2 text-sm text-stone-300">
           <span>Случайных оппонентов:</span>
-          {[1, 2, 3, 4, 5].map((n) => (
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
             <button
               key={n}
               type="button"
@@ -144,7 +144,7 @@ export function CalculatorView({ onBack }: { onBack: () => void }) {
               {n}
             </button>
           ))}
-          <span className="text-xs text-stone-500">(если не заданы карты оппонента)</span>
+          <span className="text-xs text-stone-500">(до 8 — полный стол 9-max; если не заданы карты оппонента)</span>
         </div>
 
         {/* Раскладка колоды */}
