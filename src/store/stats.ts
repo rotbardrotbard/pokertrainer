@@ -2,7 +2,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export type TrainerId = 'sim' | 'math' | 'outs' | 'ev' | 'winner' | 'combo' | 'omaha' | 'omaha4' | 'omaha5'
+export type TrainerId = 'sim' | 'math' | 'outs' | 'ev' | 'winner' | 'combo' | 'omaha' | 'omaha4' | 'omaha5' | 'omaha4sim' | 'omaha5sim'
 
 export interface TrainerStats {
   attempts: number
@@ -32,6 +32,8 @@ function emptyStats(): Record<TrainerId, TrainerStats> {
     omaha: { attempts: 0, correct: 0, sessionAttempts: 0, sessionCorrect: 0 },
     omaha4: { attempts: 0, correct: 0, sessionAttempts: 0, sessionCorrect: 0 },
     omaha5: { attempts: 0, correct: 0, sessionAttempts: 0, sessionCorrect: 0 },
+    omaha4sim: { attempts: 0, correct: 0, sessionAttempts: 0, sessionCorrect: 0 },
+    omaha5sim: { attempts: 0, correct: 0, sessionAttempts: 0, sessionCorrect: 0 },
   }
 }
 

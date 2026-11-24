@@ -1,7 +1,7 @@
 'use client'
 
 // Главная: режимы тренировки, статистика, серия дней
-import { Flame, Zap, Sigma, Target, Percent, Swords, Layers, Grid3x3, Calculator, Trophy, ShieldCheck, Spade, Copy, SquareStack } from 'lucide-react'
+import { Flame, Zap, Sigma, Target, Percent, Swords, Layers, Grid3x3, Calculator, Trophy, ShieldCheck, Spade, Copy, SquareStack, Shuffle, Dices } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { TrainerId, useStats, accuracy } from '@/store/stats'
 import { PlayingCard, CardRow } from './PlayingCard'
@@ -28,6 +28,8 @@ const MODES: ModeCard[] = [
   { id: 'omaha', title: 'Омаха классическая', desc: '4 карты руки: ровно 2 + 3 с доски — кто победил?', icon: Spade, trainer: 'omaha' },
   { id: 'omaha4', title: '4-card Омаха · 2 доски', desc: 'Двойной борд: какие доски вы выигрываете?', icon: Copy, trainer: 'omaha4' },
   { id: 'omaha5', title: '5-card Омаха · 2 доски', desc: 'Пять карт руки на двух досках — чтение двух банков', icon: SquareStack, trainer: 'omaha5' },
+  { id: 'omaha4sim', title: 'Симулятор · 4-card Омаха (2 доски)', desc: 'Раздачи на двух бордах: фолд, колл или рейз — с разбором', icon: Shuffle, trainer: 'omaha4sim' },
+  { id: 'omaha5sim', title: 'Симулятор · 5-card Омаха (2 доски)', desc: 'Раздачи с пятью картами руки и эквити обеих досок', icon: Dices, trainer: 'omaha5sim' },
   { id: 'ranges', title: 'Диапазоны префлоп', desc: 'Чарты 6-max по позициям', icon: Grid3x3 },
   { id: 'calculator', title: 'Калькулятор эквити', desc: 'Monte Carlo против любых рук', icon: Calculator },
 ]
