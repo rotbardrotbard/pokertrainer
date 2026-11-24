@@ -62,8 +62,8 @@ function boardStreetLabel(n: number): string {
 function gtoInitFor(scenario: OmahaSimScenario): GtoInitial {
   const game: GameKind = scenario.holeCount === 4 ? 'omaha4' : 'omaha5'
   if (scenario.kind === 'postflop') {
-    // Обе доски на одной улице (открываются синхронно)
-    const street: Street = scenario.boardStreet === 3 ? 'flop' : 'turn'
+    // Обе доски на одной улице (открываются синхронно: 2 флопа → 2 терна → 2 ривера)
+    const street: Street = scenario.boardStreet === 3 ? 'flop' : scenario.boardStreet === 4 ? 'turn' : 'river'
     return { game, street, seat: 'BB', opponents: 1 }
   }
   return {

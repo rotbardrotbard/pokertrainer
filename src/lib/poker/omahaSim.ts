@@ -310,7 +310,7 @@ export interface OmahaSimScenario {
   kind: OmahaSimKind
   hero: Card[]
   boards: [Card[], Card[]] | null // только postflop
-  boardStreet: number // общая улица постфлопа: длина ОБЕИХ досок (3=флоп, 4=терн); доски открываются синхронно
+  boardStreet: number // общая улица постфлопа: длина ОБЕИХ досок (3=флоп, 4=терн, 5=ривер); доски открываются синхронно
   position: Position
   players: number // размер стола (влияет на ширину диапазона)
   chart: OmahaPreflop | null // GTO-чарт позиции (префлоп)
@@ -332,7 +332,7 @@ export interface OmahaSimScenario {
 }
 
 const ri = (n: number) => Math.floor(Math.random() * n)
-const pick = <T,>(arr: T[]): T => arr[ri(arr.length)]
+const pick = <T,>(arr: readonly T[]): T => arr[ri(arr.length)]
 
 // размеры стола в симуляторе: от хедз-апа до 9-max
 const SIM_TABLES = [2, 3, 4, 5, 6, 9] as const
@@ -476,13 +476,13 @@ function genPostflopScenario(holeCount: 4 | 5): OmahaSimScenario {
   for (let t = 0; t < 4; t++) {
     const deck = shuffled()
     const hero = deck.slice(0, holeCount)
-    // Обе доски на одной улице: сначала 2 флопа, затем 2 терна (синхронно)
-    const n = pick([3, 3, 3, 4])
+    // Обе доски на одной улице: 2 флопа → 2 терна → 2 ривера (синхронно)
+    const n = pick([3, 3, 4, 5])
     const b1 = deck.slice(holeCount, holeCount + n)
     const b2 = deck.slice(holeCount + n, holeCount + 2 * n)
     const sim = simulateOmahaDouble({ hero, boards: [b1, b2], holeCount, iterations: 600 })
     const totalPct = sim.total * 100
-    const street = n === 3 ? 'флоп' : 'терн'
+    const street = n === 3 ? 'флоп' : n === 4 ? 'терн' : 'ривер'
     const heroHands: [string, string] = [
       handName(bestOmahaHand(hero, b1)),
       handName(bestOmahaHand(hero, b2)),
@@ -502,7 +502,7 @@ function genPostflopScenario(holeCount: 4 | 5): OmahaSimScenario {
         : 'фолд — колл теряет деньги'
     const streetLabel = street
     // GTO-ориентир по общей улице
-    const gtoStreet: 'flop' | 'turn' = n === 3 ? 'flop' : 'turn'
+    const gtoStreet: 'flop' | 'turn' | 'river' = n === 3 ? 'flop' : n === 4 ? 'turn' : 'river'
     const tier = omahaEquityTier(gameOf(holeCount), gtoStreet, correct)
     const scenario: OmahaSimScenario = {
       holeCount,

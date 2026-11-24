@@ -167,6 +167,9 @@ function hasDuplicates(cards: Card[]): boolean {
 }
 
 {
+  let flopN = 0
+  let turnN = 0
+  let riverN = 0
   for (let t = 0; t < 60; t++) {
     for (const hc of [4, 5] as const) {
       const s = genOmahaSimScenario(hc)
@@ -176,11 +179,18 @@ function hasDuplicates(cards: Card[]): boolean {
         assert(s.sim !== null && s.heroHands !== null && s.heroBest !== null, 'postflop fields')
         assert(s.chart === null && s.handPct === null, 'postflop no chart')
         assert(s.gtoHint !== null && s.gtoHint.length > 0, 'postflop gtoHint')
-        // обе доски на одной улице: открываются синхронно (2 флопа, затем 2 терна)
+        // обе доски на одной улице: открываются синхронно (2 флопа → 2 терна → 2 ривера)
         assert(
           s.boards![0].length === s.boards![1].length && s.boards![0].length >= 3 && s.boards![0].length <= 5,
           `boards same street #${t}: ${s.boards![0].length} vs ${s.boards![1].length}`,
         )
+        // подпись улицы в промпте соответствует длине досок
+        const nCards = s.boards![0].length
+        const streetWord = nCards === 3 ? 'флоп.' : nCards === 4 ? 'терн.' : 'ривер.'
+        assert(s.prompt.startsWith(streetWord), `street label matches board size #${t}: ${s.prompt.slice(0, 12)}`)
+        if (nCards === 3) flopN++
+        else if (nCards === 4) turnN++
+        else riverN++
         // названия комбинаций пересчитываем независимо
         const n1 = handName(bestOmahaHand(s.hero, s.boards![0]))
         const n2 = handName(bestOmahaHand(s.hero, s.boards![1]))
@@ -223,6 +233,9 @@ function hasDuplicates(cards: Card[]): boolean {
       assert(!hasDuplicates(s.hero), 'hero cards unique')
     }
   }
+  // все три улицы генерируются (120 сценариев: постфлоп ~45%, ривер ~25% постфлопов)
+  console.log(`Улицы постфлопа: флоп ${flopN}, терн ${turnN}, ривер ${riverN} (из 120 сценариев)`)
+  assert(flopN > 0 && turnN > 0 && riverN > 0, 'all streets generated (flop/turn/river)')
 }
 
 // ---------- 5b. omahaHandPercentile: место руки «топ X%» ----------

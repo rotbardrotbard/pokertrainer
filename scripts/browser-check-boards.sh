@@ -1,5 +1,5 @@
 #!/bin/bash
-# Прогон симулятора: проверка синхронности досок (обе доски одной длины)
+# Прогон симулятора: проверка синхронности досок (обе доски одной длины и одной улицы)
 set -u
 POSTFLOP=0
 BAD=0
@@ -28,15 +28,21 @@ js_act='(() => {
 })()'
 
 for i in $(seq 1 60); do
-  OUT=$(agent-browser eval "$js_kind" 2>/dev/null | tr -d '"')
-  case "$OUT" in
+  # agent-browser выводит JS-строку с экранированными кавычками \" — убираем бэкслеши
+  RAW=$(agent-browser eval "$js_kind" 2>/dev/null | sed 's/\\"/"/g')
+  case "$RAW" in
     *postflop*)
       POSTFLOP=$((POSTFLOP+1))
-      B1N=$(echo "$OUT" | grep -o '"n":[0-9-]*' | head -1 | cut -d: -f2)
-      B2N=$(echo "$OUT" | grep -o '"n":[0-9-]*' | tail -1 | cut -d: -f2)
-      S1=$(echo "$OUT" | grep -o '"street":"[^"]*"' | head -1)
-      S2=$(echo "$OUT" | grep -o '"street":"[^"]*"' | tail -1)
-      if [ "$B1N" != "$B2N" ] || [ "$S1" != "$S2" ]; then
+      # парсим по сырому JSON (кавычки сохранены)
+      B1N=$(echo "$RAW" | grep -o '"n":[0-9-]*' | head -1 | cut -d: -f2)
+      B2N=$(echo "$RAW" | grep -o '"n":[0-9-]*' | tail -1 | cut -d: -f2)
+      S1=$(echo "$RAW" | grep -o '"street":"[^"]*"' | head -1)
+      S2=$(echo "$RAW" | grep -o '"street":"[^"]*"' | tail -1)
+      # пустые значения = ошибка парсинга, тоже считаем сбоем
+      if [ -z "$B1N" ] || [ -z "$B2N" ] || [ -z "$S1" ] || [ -z "$S2" ]; then
+        BAD=$((BAD+1))
+        BAD_LOG+=("iter $i: parse failure: $RAW")
+      elif [ "$B1N" != "$B2N" ] || [ "$S1" != "$S2" ]; then
         BAD=$((BAD+1))
         BAD_LOG+=("iter $i: b1=$B1N b2=$B2N $S1 $S2")
       fi
@@ -50,7 +56,7 @@ echo "Постфлоп-сценариев: $POSTFLOP из 60"
 if [ "$BAD" -eq 0 ]; then
   echo "OK: во всех постфлоп-сценариях доски одной длины и одна улица"
 else
-  echo "FAIL: рассинхрон досок в $BAD случаях:"
+  echo "FAIL: проблем в $BAD случаях:"
   printf '%s\n' "${BAD_LOG[@]}"
   exit 1
 fi
