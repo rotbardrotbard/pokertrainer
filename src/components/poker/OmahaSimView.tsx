@@ -91,10 +91,10 @@ function OpenGtoButton({ scenario, onOpenGto }: { scenario: OmahaSimScenario; on
   )
 }
 
-/** Панель GTO-чарта позиции (префлоп): диапазон рейза/колла и место руки. */
-function GtoChartPanel({ scenario, onOpenGto }: { scenario: OmahaSimScenario; onOpenGto?: (init: GtoInitial) => void }) {
+/** Чипы диапазонов GTO-чарта (общие для подсказки до ответа и разбора после ответа). */
+function chartRangeChips(scenario: OmahaSimScenario): Array<{ text: string; action: 'raise' | 'call' | 'fold' }> {
   const chart = scenario.chart!
-  const chips: Array<{ text: string; action: 'raise' | 'call' | 'fold' }> = scenario.kind === 'open'
+  return scenario.kind === 'open'
     ? [
         { text: `Рейз: топ ~${Math.round(chart.openPercent)}% рук`, action: 'raise' },
         { text: 'Фолд: остальное', action: 'fold' },
@@ -104,6 +104,11 @@ function GtoChartPanel({ scenario, onOpenGto }: { scenario: OmahaSimScenario; on
         { text: `Колл: топ ~${Math.round(chart.callPercent)}%`, action: 'call' },
         { text: 'Фолд: остальное', action: 'fold' },
       ]
+}
+
+/** Панель GTO-чарта позиции (префлоп): диапазон рейза/колла и место руки. */
+function GtoChartPanel({ scenario, onOpenGto }: { scenario: OmahaSimScenario; onOpenGto?: (init: GtoInitial) => void }) {
+  const chips = chartRangeChips(scenario)
   return (
     <Card className="border-emerald-800/60 bg-emerald-950/40">
       <CardContent className="p-4 flex flex-col gap-3">
@@ -154,6 +159,7 @@ function GtoPostflopPanel({ scenario, streetLabel, onOpenGto }: { scenario: Omah
 
 export function OmahaSimView({ variant, onBack, onOpenGto }: { variant: DoubleVariant; onBack: () => void; onOpenGto?: (init: GtoInitial) => void }) {
   const record = useStats((s) => s.recordAnswer)
+  const recordHint = useStats((s) => s.recordHint)
   const trainerId = TRAINER_BY_VARIANT[variant]
   const meta = META[variant]
   const holeCount: 4 | 5 = variant === 'double4' ? 4 : 5
@@ -175,6 +181,12 @@ export function OmahaSimView({ variant, onBack, onOpenGto }: { variant: DoubleVa
     if (!hintShown) record(trainerId, a === scenario.correctAction)
   }
 
+  function showHint() {
+    if (hintShown) return
+    setHintShown(true)
+    recordHint(trainerId) // раздача с подсказкой не идёт в точность, но подсказка учитывается
+  }
+
   if (!scenario) {
     return (
       <TrainerShell title={meta.title} subtitle={meta.subtitle} trainerId={trainerId} onBack={onBack}>
@@ -188,7 +200,7 @@ export function OmahaSimView({ variant, onBack, onOpenGto }: { variant: DoubleVa
             <li>Комбинация — ровно 2 карты руки + 3 с доски</li>
             <li>Каждая доска — отдельная половина банка, эквити усредняется</li>
             <li>Префлоп — по GTO-чартам позиции: диапазон зависит от позиции и размера стола (2–9 max)</li>
-            <li>Постфлоп — по кнопке «Подсказка» можно увидеть эквити до ответа (не идёт в статистику)</li>
+            <li>По кнопке «Подсказка» — эквити до ответа (постфлоп) или место руки по чарту (префлоп); раздача с подсказкой не идёт в статистику</li>
             <li>После ответа — чарт позиции и переход в раздел GTO с вашими параметрами</li>
           </ul>
           <Button onClick={next} className="bg-emerald-600 text-white hover:bg-emerald-500">
@@ -242,6 +254,22 @@ export function OmahaSimView({ variant, onBack, onOpenGto }: { variant: DoubleVa
     </div>
   ) : null
 
+  // префлоп-подсказка: диапазоны чарта позиции + место руки (без вывода-вердикта)
+  const preflopHintPanel = !isPostflop && scenario.chart && scenario.handPct !== null ? (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex flex-wrap gap-2">
+        {chartRangeChips(scenario).map((c, i) => (
+          <span key={i} className={cn('px-3 py-1.5 rounded-md text-xs font-normal', CHIP_STYLES[c.action])}>
+            {c.text}
+          </span>
+        ))}
+      </div>
+      <p className="text-xs text-stone-300">
+        Ваша рука — топ ~{scenario.handPct}% всех стартовых рук {scenario.holeCount}-card Омахи.
+      </p>
+    </div>
+  ) : null
+
   return (
     <TrainerShell title={meta.title} subtitle={meta.subtitle} trainerId={trainerId} onBack={onBack}>
       <ScenarioCard>
@@ -283,9 +311,9 @@ export function OmahaSimView({ variant, onBack, onOpenGto }: { variant: DoubleVa
 
         <p className="text-sm text-stone-100 font-medium">{scenario.prompt}</p>
 
-        {!answered && hintShown && equityPanel && (
+        {!answered && hintShown && (isPostflop ? equityPanel : preflopHintPanel) && (
           <div className="flex flex-col gap-1.5">
-            {equityPanel}
+            {isPostflop ? equityPanel : preflopHintPanel}
             <p className="text-xs text-stone-500">
               Подсказка до ответа: эта раздача не будет учтена в статистике.
             </p>
@@ -316,15 +344,15 @@ export function OmahaSimView({ variant, onBack, onOpenGto }: { variant: DoubleVa
           </div>
         )}
 
-        {!answered && isPostflop && !hintShown && (
+        {!answered && !hintShown && (
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setHintShown(true)}
+            onClick={showHint}
             className="text-stone-400 hover:text-stone-200 hover:bg-stone-800/70 h-8 w-fit px-2 gap-1.5"
           >
             <Lightbulb className="w-3.5 h-3.5" />
-            Подсказка: показать эквити
+            {isPostflop ? 'Подсказка: показать эквити' : 'Подсказка: место руки по чарту'}
           </Button>
         )}
       </ScenarioCard>

@@ -7,6 +7,7 @@ export type TrainerId = 'sim' | 'math' | 'outs' | 'ev' | 'winner' | 'combo' | 'o
 export interface TrainerStats {
   attempts: number
   correct: number
+  hints: number // использованные подсказки (не идут в точность)
   sessionAttempts: number
   sessionCorrect: number
 }
@@ -17,23 +18,24 @@ interface StatsState {
   bestStreak: number
   lastPlayedDate: string | null
   recordAnswer: (trainer: TrainerId, correct: boolean) => void
+  recordHint: (trainer: TrainerId) => void
   resetSession: (trainer: TrainerId) => void
   resetAll: () => void
 }
 
 function emptyStats(): Record<TrainerId, TrainerStats> {
   return {
-    sim: { attempts: 0, correct: 0, sessionAttempts: 0, sessionCorrect: 0 },
-    math: { attempts: 0, correct: 0, sessionAttempts: 0, sessionCorrect: 0 },
-    outs: { attempts: 0, correct: 0, sessionAttempts: 0, sessionCorrect: 0 },
-    ev: { attempts: 0, correct: 0, sessionAttempts: 0, sessionCorrect: 0 },
-    winner: { attempts: 0, correct: 0, sessionAttempts: 0, sessionCorrect: 0 },
-    combo: { attempts: 0, correct: 0, sessionAttempts: 0, sessionCorrect: 0 },
-    omaha: { attempts: 0, correct: 0, sessionAttempts: 0, sessionCorrect: 0 },
-    omaha4: { attempts: 0, correct: 0, sessionAttempts: 0, sessionCorrect: 0 },
-    omaha5: { attempts: 0, correct: 0, sessionAttempts: 0, sessionCorrect: 0 },
-    omaha4sim: { attempts: 0, correct: 0, sessionAttempts: 0, sessionCorrect: 0 },
-    omaha5sim: { attempts: 0, correct: 0, sessionAttempts: 0, sessionCorrect: 0 },
+    sim: { attempts: 0, correct: 0, hints: 0, sessionAttempts: 0, sessionCorrect: 0 },
+    math: { attempts: 0, correct: 0, hints: 0, sessionAttempts: 0, sessionCorrect: 0 },
+    outs: { attempts: 0, correct: 0, hints: 0, sessionAttempts: 0, sessionCorrect: 0 },
+    ev: { attempts: 0, correct: 0, hints: 0, sessionAttempts: 0, sessionCorrect: 0 },
+    winner: { attempts: 0, correct: 0, hints: 0, sessionAttempts: 0, sessionCorrect: 0 },
+    combo: { attempts: 0, correct: 0, hints: 0, sessionAttempts: 0, sessionCorrect: 0 },
+    omaha: { attempts: 0, correct: 0, hints: 0, sessionAttempts: 0, sessionCorrect: 0 },
+    omaha4: { attempts: 0, correct: 0, hints: 0, sessionAttempts: 0, sessionCorrect: 0 },
+    omaha5: { attempts: 0, correct: 0, hints: 0, sessionAttempts: 0, sessionCorrect: 0 },
+    omaha4sim: { attempts: 0, correct: 0, hints: 0, sessionAttempts: 0, sessionCorrect: 0 },
+    omaha5sim: { attempts: 0, correct: 0, hints: 0, sessionAttempts: 0, sessionCorrect: 0 },
   }
 }
 
@@ -58,7 +60,7 @@ export const useStats = create<StatsState>()(
       recordAnswer: (trainer, correct) => {
         const s = get()
         // защита от старых сохранений без новых режимов
-        const t = s.stats[trainer] ?? { attempts: 0, correct: 0, sessionAttempts: 0, sessionCorrect: 0 }
+        const t = s.stats[trainer] ?? { attempts: 0, correct: 0, hints: 0, sessionAttempts: 0, sessionCorrect: 0 }
         const today = todayStr()
         let streak = s.streak
         let bestStreak = s.bestStreak
@@ -71,6 +73,7 @@ export const useStats = create<StatsState>()(
           stats: {
             ...s.stats,
             [trainer]: {
+              ...t, // сохраняем прочие поля (например, hints)
               attempts: t.attempts + 1,
               correct: t.correct + (correct ? 1 : 0),
               sessionAttempts: t.sessionAttempts + 1,
@@ -82,9 +85,16 @@ export const useStats = create<StatsState>()(
           lastPlayedDate: today,
         })
       },
+      recordHint: (trainer) => {
+        const s = get()
+        const t = s.stats[trainer] ?? { attempts: 0, correct: 0, hints: 0, sessionAttempts: 0, sessionCorrect: 0 }
+        set({
+          stats: { ...s.stats, [trainer]: { ...t, hints: t.hints + 1 } },
+        })
+      },
       resetSession: (trainer) => {
         const s = get()
-        const t = s.stats[trainer] ?? { attempts: 0, correct: 0, sessionAttempts: 0, sessionCorrect: 0 }
+        const t = s.stats[trainer] ?? { attempts: 0, correct: 0, hints: 0, sessionAttempts: 0, sessionCorrect: 0 }
         set({
           stats: { ...s.stats, [trainer]: { ...t, sessionAttempts: 0, sessionCorrect: 0 } },
         })

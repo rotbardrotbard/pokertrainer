@@ -2,7 +2,7 @@
 
 // Общий каркас тренажёра: шапка, статистика, кнопки действий, разбор ответа
 import { ReactNode } from 'react'
-import { ArrowLeft, RotateCcw, CheckCircle2, XCircle, Flame, Target } from 'lucide-react'
+import { ArrowLeft, RotateCcw, CheckCircle2, XCircle, Flame, Target, Lightbulb } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { TrainerId, useStats, accuracy } from '@/store/stats'
@@ -37,6 +37,12 @@ export function TrainerShell({ title, subtitle, trainerId, onBack, children }: T
             <Flame className="w-3.5 h-3.5" />
             Всего: {lifetime === null ? '—' : `${lifetime}%`} ({stats ? stats.attempts : 0})
           </span>
+          {stats !== null && stats.hints > 0 && (
+            <span className="flex items-center gap-1 text-stone-400">
+              <Lightbulb className="w-3.5 h-3.5" />
+              Подсказки: {stats.hints}
+            </span>
+          )}
         </div>
       </div>
 
