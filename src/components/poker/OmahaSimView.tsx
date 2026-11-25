@@ -4,7 +4,7 @@
 // Префлоп: решения по GTO-чартам позиции (как в разделе GTO-чарты).
 // Постфлоп: решения по эквити двух досок. После ответа — чарт позиции и переход в GTO.
 import { useState } from 'react'
-import { Compass, ArrowUpRight } from 'lucide-react'
+import { Compass, ArrowUpRight, Lightbulb } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -160,16 +160,19 @@ export function OmahaSimView({ variant, onBack, onOpenGto }: { variant: DoubleVa
 
   const [scenario, setScenario] = useState<OmahaSimScenario | null>(null)
   const [answered, setAnswered] = useState<OmahaSimAction | null>(null)
+  const [hintShown, setHintShown] = useState(false)
 
   function next() {
     setScenario(genOmahaSimScenario(holeCount))
     setAnswered(null)
+    setHintShown(false)
   }
 
   function answer(a: OmahaSimAction) {
     if (!scenario || answered) return
     setAnswered(a)
-    record(trainerId, a === scenario.correctAction)
+    // раздача, решённая по подсказке, не идёт в статистику
+    if (!hintShown) record(trainerId, a === scenario.correctAction)
   }
 
   if (!scenario) {
@@ -185,6 +188,7 @@ export function OmahaSimView({ variant, onBack, onOpenGto }: { variant: DoubleVa
             <li>Комбинация — ровно 2 карты руки + 3 с доски</li>
             <li>Каждая доска — отдельная половина банка, эквити усредняется</li>
             <li>Префлоп — по GTO-чартам позиции: диапазон зависит от позиции и размера стола (2–9 max)</li>
+            <li>Постфлоп — по кнопке «Подсказка» можно увидеть эквити до ответа (не идёт в статистику)</li>
             <li>После ответа — чарт позиции и переход в раздел GTO с вашими параметрами</li>
           </ul>
           <Button onClick={next} className="bg-emerald-600 text-white hover:bg-emerald-500">
@@ -215,6 +219,28 @@ export function OmahaSimView({ variant, onBack, onOpenGto }: { variant: DoubleVa
     ? [...scenario.heroBest[0], ...scenario.heroBest[1]].filter((c) =>
         scenario.hero.some((h) => h.r === c.r && h.s === c.s))
     : undefined
+
+  // панель эквити: до ответа (по подсказке) и после ответа
+  const equityPanel = isPostflop && scenario.sim ? (
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+      <div className="rounded-lg border border-stone-800 bg-stone-900/60 p-3">
+        <p className="text-stone-500">Эквити · Доска 1</p>
+        <p className="text-lg text-stone-100 font-normal">{(scenario.sim.eq1 * 100).toFixed(0)}%</p>
+      </div>
+      <div className="rounded-lg border border-stone-800 bg-stone-900/60 p-3">
+        <p className="text-stone-500">Эквити · Доска 2</p>
+        <p className="text-lg text-stone-100 font-normal">{(scenario.sim.eq2 * 100).toFixed(0)}%</p>
+      </div>
+      <div className="rounded-lg border border-stone-800 bg-stone-900/60 p-3">
+        <p className="text-stone-500">Эквити по банку</p>
+        <p className="text-lg text-emerald-400 font-normal">{(scenario.sim.total * 100).toFixed(1)}%</p>
+      </div>
+      <div className="rounded-lg border border-stone-800 bg-stone-900/60 p-3">
+        <p className="text-stone-500">Требуемые пот-оддсы</p>
+        <p className="text-lg text-stone-100 font-normal">{scenario.requiredPct}%</p>
+      </div>
+    </div>
+  ) : null
 
   return (
     <TrainerShell title={meta.title} subtitle={meta.subtitle} trainerId={trainerId} onBack={onBack}>
@@ -257,6 +283,15 @@ export function OmahaSimView({ variant, onBack, onOpenGto }: { variant: DoubleVa
 
         <p className="text-sm text-stone-100 font-medium">{scenario.prompt}</p>
 
+        {!answered && hintShown && equityPanel && (
+          <div className="flex flex-col gap-1.5">
+            {equityPanel}
+            <p className="text-xs text-stone-500">
+              Подсказка до ответа: эта раздача не будет учтена в статистике.
+            </p>
+          </div>
+        )}
+
         {!answered && (
           <div className="flex flex-wrap gap-2">
             <Button
@@ -280,6 +315,18 @@ export function OmahaSimView({ variant, onBack, onOpenGto }: { variant: DoubleVa
             </Button>
           </div>
         )}
+
+        {!answered && isPostflop && !hintShown && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setHintShown(true)}
+            className="text-stone-400 hover:text-stone-200 hover:bg-stone-800/70 h-8 w-fit px-2 gap-1.5"
+          >
+            <Lightbulb className="w-3.5 h-3.5" />
+            Подсказка: показать эквити
+          </Button>
+        )}
       </ScenarioCard>
 
       {answered && (
@@ -288,30 +335,13 @@ export function OmahaSimView({ variant, onBack, onOpenGto }: { variant: DoubleVa
             correct={correct}
             headline={correct ? 'Верно!' : 'Ошибка'}
             explanation={scenario.explanation}
-            detail={scenario.detail}
+            detail={hintShown
+              ? [...scenario.detail, 'Подсказка использована — раздача не учтена в статистике.']
+              : scenario.detail}
             onNext={next}
             nextLabel="Следующая раздача"
           />
-          {isPostflop && scenario.sim && (
-            <div className={cn('grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs')}>
-              <div className="rounded-lg border border-stone-800 bg-stone-900/60 p-3">
-                <p className="text-stone-500">Эквити · Доска 1</p>
-                <p className="text-lg text-stone-100 font-normal">{(scenario.sim.eq1 * 100).toFixed(0)}%</p>
-              </div>
-              <div className="rounded-lg border border-stone-800 bg-stone-900/60 p-3">
-                <p className="text-stone-500">Эквити · Доска 2</p>
-                <p className="text-lg text-stone-100 font-normal">{(scenario.sim.eq2 * 100).toFixed(0)}%</p>
-              </div>
-              <div className="rounded-lg border border-stone-800 bg-stone-900/60 p-3">
-                <p className="text-stone-500">Эквити по банку</p>
-                <p className="text-lg text-emerald-400 font-normal">{(scenario.sim.total * 100).toFixed(1)}%</p>
-              </div>
-              <div className="rounded-lg border border-stone-800 bg-stone-900/60 p-3">
-                <p className="text-stone-500">Требуемые пот-оддсы</p>
-                <p className="text-lg text-stone-100 font-normal">{scenario.requiredPct}%</p>
-              </div>
-            </div>
-          )}
+          {isPostflop && equityPanel}
           {!isPostflop && scenario.chart && (
             <GtoChartPanel scenario={scenario} onOpenGto={onOpenGto} />
           )}
