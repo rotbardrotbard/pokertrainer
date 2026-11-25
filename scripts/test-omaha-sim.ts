@@ -3,7 +3,7 @@ import { parseCard, Card, fullDeck, shuffle } from '../src/lib/poker/cards'
 import { evaluate5, handName } from '../src/lib/poker/evaluator'
 import { bestOmahaHand } from '../src/lib/poker/omaha'
 import {
-  bestOmahaScoreFast, simulateOmahaDouble, analyzePloHand, genOmahaSimScenario,
+  bestOmahaScoreFast, simulateOmahaDouble, analyzePloHand, genOmahaSimScenario, genOmahaSimExam,
 } from '../src/lib/poker/omahaSim'
 import { omahaPreflop, omahaAction, omahaEquityTier } from '../src/lib/poker/gto'
 import { omahaHandPercentile, handInRange } from '../src/lib/poker/handRanges'
@@ -283,6 +283,56 @@ function hasDuplicates(cards: Card[]): boolean {
       assert(tRaise.tier.length > 0 && tCall.tier.length > 0 && tFold.tier.length > 0, 'tiers have titles')
     }
   }
+}
+
+// ---------- 5d. Режим экзамена: состав и целостность ----------
+{
+  for (const hc of [4, 5] as const) {
+    for (const len of [5, 10, 20] as const) {
+      const exam = genOmahaSimExam(hc, len)
+      assert(exam.length === len, `exam length ${hc}/${len}, got ${exam.length}`)
+      let openN = 0
+      let vsN = 0
+      let flopN = 0
+      let turnN = 0
+      let riverN = 0
+      for (const s of exam) {
+        assert(s.hero.length === hc, `exam hole count ${hc}`)
+        assert(!hasDuplicates(s.hero), 'exam hero cards unique')
+        if (s.kind === 'open') {
+          openN++
+          assert(s.boards === null && s.chart !== null, 'exam open: preflop fields')
+        } else if (s.kind === 'vsRaise') {
+          vsN++
+          assert(s.boards === null && s.chart !== null, 'exam vsraise: preflop fields')
+        } else {
+          if (s.boardStreet === 3) flopN++
+          else if (s.boardStreet === 4) turnN++
+          else riverN++
+          // улица вопроса соответствует запрошенной: обе доски нужной длины
+          assert(
+            s.boards![0].length === s.boardStreet && s.boards![1].length === s.boardStreet,
+            `exam postflop boards match street: ${s.boards![0].length}/${s.boards![1].length} vs ${s.boardStreet}`,
+          )
+          assert(s.sim !== null && s.chart === null, 'exam postflop fields')
+        }
+      }
+      const per = len / 5
+      assert(openN === per && vsN === per, `exam preflop mix ${hc}/${len}: open ${openN}, vs ${vsN}`)
+      assert(
+        flopN === per && turnN === per && riverN === per,
+        `exam streets mix ${hc}/${len}: flop ${flopN}, turn ${turnN}, river ${riverN}`,
+      )
+    }
+  }
+  // порядок вопросов перемешан (на достаточной выборке встречаются разные первые вопросы)
+  const firsts = new Set<string>()
+  for (let t = 0; t < 30; t++) {
+    const exam = genOmahaSimExam(4, 10)
+    firsts.add(exam[0].kind)
+  }
+  assert(firsts.size > 1, `exam order shuffled, first kinds: ${[...firsts].join(',')}`)
+  console.log(`Экзамен: состав 5/10/20 для 4-card и 5-card корректен; первый вопрос варьируется (${firsts.size} варианта)`)
 }
 
 // ---------- 6. Производительность ----------

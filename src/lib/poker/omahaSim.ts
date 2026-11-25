@@ -463,7 +463,7 @@ function genVsRaiseScenario(holeCount: 4 | 5): OmahaSimScenario {
 
 // --- Постфлоп: решение против ставки на двух досках ---
 
-function genPostflopScenario(holeCount: 4 | 5): OmahaSimScenario {
+function genPostflopScenario(holeCount: 4 | 5, forceStreet?: 3 | 4 | 5): OmahaSimScenario {
   const pot = pick([30, 40, 60, 80])
   const betMult = pick([0.5, 0.75, 1])
   const bet = Math.round(pot * betMult)
@@ -477,7 +477,8 @@ function genPostflopScenario(holeCount: 4 | 5): OmahaSimScenario {
     const deck = shuffled()
     const hero = deck.slice(0, holeCount)
     // Обе доски на одной улице: 2 флопа → 2 терна → 2 ривера (синхронно)
-    const n = pick([3, 3, 4, 5])
+    // forceStreet — для режима экзамена (фиксированная улица вопроса)
+    const n = forceStreet ?? pick([3, 3, 4, 5])
     const b1 = deck.slice(holeCount, holeCount + n)
     const b2 = deck.slice(holeCount + n, holeCount + 2 * n)
     const sim = simulateOmahaDouble({ hero, boards: [b1, b2], holeCount, iterations: 600 })
@@ -555,4 +556,43 @@ export function genOmahaSimScenario(holeCount: 4 | 5): OmahaSimScenario {
   if (r < 0.3) return genOpenScenario(holeCount)
   if (r < 0.55) return genVsRaiseScenario(holeCount)
   return genPostflopScenario(holeCount)
+}
+
+// ============ Режим экзамена ============
+
+export type ExamLength = 5 | 10 | 20
+
+/** Сценарий заданного типа (для экзамена). street — только для postflop (3=флоп, 4=терн, 5=ривер). */
+export function genOmahaSimScenarioOf(
+  holeCount: 4 | 5,
+  kind: 'open' | 'vsRaise' | 'postflop',
+  street?: 3 | 4 | 5,
+): OmahaSimScenario {
+  if (kind === 'open') return genOpenScenario(holeCount)
+  if (kind === 'vsRaise') return genVsRaiseScenario(holeCount)
+  return genPostflopScenario(holeCount, street)
+}
+
+/**
+ * Экзамен: сбалансированный набор раздач фиксированной длины.
+ * На каждые 5 вопросов — 1 открытие, 1 защита против рейза и по одному
+ * постфлоп-решению на флопе, терне и ривере. Порядок вопросов перемешан.
+ */
+export function genOmahaSimExam(holeCount: 4 | 5, length: ExamLength): OmahaSimScenario[] {
+  const per = length / 5
+  const plan: Array<{ kind: 'open' | 'vsRaise' | 'postflop'; street?: 3 | 4 | 5 }> = []
+  for (let i = 0; i < per; i++) {
+    plan.push(
+      { kind: 'open' },
+      { kind: 'vsRaise' },
+      { kind: 'postflop', street: 3 },
+      { kind: 'postflop', street: 4 },
+      { kind: 'postflop', street: 5 },
+    )
+  }
+  for (let i = plan.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[plan[i], plan[j]] = [plan[j], plan[i]]
+  }
+  return plan.map((p) => genOmahaSimScenarioOf(holeCount, p.kind, p.street))
 }
