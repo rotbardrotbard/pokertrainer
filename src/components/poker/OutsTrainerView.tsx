@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { TrainerShell, Feedback, ScenarioCard } from './TrainerShell'
 import { PlayingCard, CardRow } from './PlayingCard'
 import { useStats } from '@/store/stats'
-import { OutsQuestion, genOutsQuestion, describeOuts } from '@/lib/poker/training'
+import { OutsQuestion, genOutsQuestion, describeOuts, OUTS_SCENARIOS } from '@/lib/poker/training'
 
 export function OutsTrainerView({ onBack }: { onBack: () => void }) {
   const record = useStats((s) => s.recordAnswer)
@@ -36,12 +36,14 @@ export function OutsTrainerView({ onBack }: { onBack: () => void }) {
         <ScenarioCard>
           <p className="text-sm text-stone-300">
             Аутс — карта, которая превращает вашу руку в победную. Вы видите свои карты,
-            доску и руку оппонента. Посчитайте аутсы.
+            доску и руку оппонента. Посчитайте аутсы — банк из {OUTS_SCENARIOS.length} типов сценариев.
           </p>
           <ul className="text-xs text-stone-400 list-disc pl-4 flex flex-col gap-1">
-            <li>Флеш-дро: 9 аутсов (13 карт масти − 4 видимых)</li>
-            <li>Двусторонний стрит-дро: 8 аутсов</li>
-            <li>Гатшот (внутренний стрит-дро): 4 аутса</li>
+            <li>Флеш-дро: 9, двусторонний стрит-дро: 8, гатшот: 4, двойной гатшот: 6</li>
+            <li>Комбо-дро: стрит + флеш до 15 аутсов, флеш + гатшот — 12</li>
+            <li>Оверкарты против карманной пары: 3–6 аутсов</li>
+            <li>Сет → фулл-хаус: 7, две пары → фулл-хаус: 4, пара → сет: 2</li>
+            <li>Отравленные аутсы: карта, усиливающая оппонента сильнее вас, не считается</li>
             <li>Правило 2 и 4: аутсы × 2 на следующей улице, × 4 на двух улицах</li>
           </ul>
           <Button onClick={next} className="bg-emerald-600 text-white hover:bg-emerald-500">
@@ -58,6 +60,9 @@ export function OutsTrainerView({ onBack }: { onBack: () => void }) {
   return (
     <TrainerShell title="Аутсы и эквити" subtitle="Считайте карты, которые делают руку победной" trainerId="outs" onBack={onBack}>
       <ScenarioCard>
+        <span className="inline-block w-fit text-[11px] uppercase tracking-wider text-emerald-300 border border-emerald-800/60 rounded px-2 py-0.5 bg-emerald-900/30">
+          {question.scenario}
+        </span>
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-3">
             <span className="text-xs text-stone-400 w-20">Ваши карты</span>
@@ -100,6 +105,7 @@ export function OutsTrainerView({ onBack }: { onBack: () => void }) {
           headline={answeredCorrect ? `Верно! Аутсов: ${question.outsCount}` : `Неверно. Аутсов: ${question.outsCount}`}
           explanation={`Ваши аутсы: ${describeOuts(question.outs)}. Правило 2 и 4: шанс улучшиться ≈ ${probTurn}% на следующей карте или ≈ ${probRiver}% до ривера (с учётом двух улиц).`}
           detail={[
+            ...(question.note ? [question.note] : []),
             'Аутсы считаются ровно: карта считается, только если она делает вашу руку лучше руки оппонента.',
             'Карта, дающая оппоненту улучшение сильнее вашего (например, его флеш), не является вашим аутсом.',
           ]}

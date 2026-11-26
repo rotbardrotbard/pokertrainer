@@ -17,15 +17,34 @@ function shuffledDeck(): Card[] {
   return shuffle(fullDeck(), rand)
 }
 
-// ============ 1. МАТЕМАТИКА: ПОТ-ОДДСЫ ============
+// ============ 1. МАТЕМАТИКА: РАСШИРЕННЫЙ БАНК ЗАДАЧ ============
+
+export type MathKind =
+  | 'potOdds'
+  | 'ratio'
+  | 'rule24'
+  | 'bluffBreakeven'
+  | 'mdf'
+  | 'bluffEv'
+  | 'combos'
+  | 'spr'
 
 export interface MathQuestion {
-  pot: number
-  bet: number
-  requiredPct: number
-  ratioText: string
+  kind: MathKind
   prompt: string
   hint: string
+  /** верный числовой ответ */
+  answer: number
+  /** единица измерения: '%', 'bb', 'шт' или '' */
+  unit: '%' | 'bb' | 'шт' | ''
+  /** допустимое отклонение ответа */
+  tolerance: number
+  /** правильный ответ с кратким выводом для фидбека */
+  solutionText: string
+}
+
+export function checkMathAnswer(q: MathQuestion, answer: number): boolean {
+  return Math.abs(answer - q.answer) <= q.tolerance
 }
 
 const POT_ODDS_BETS = [
@@ -36,48 +55,184 @@ const POT_ODDS_BETS = [
   { label: 'двойной овербет', mult: 2 },
 ]
 
-export function genMathQuestion(): MathQuestion {
-  const pot = pick([40, 60, 80, 100, 120, 160, 200])
-  const b = pick(POT_ODDS_BETS)
-  const bet = Math.round((pot * b.mult) / 10) * 10
-  const required = (bet / (pot + 2 * bet)) * 100
-  const ratio = (pot + bet) / bet
-  const ratioText = `${fmtRatio(ratio)}:1`
-  const prompt =
-    `Банк — ${pot} bb. Оппонент ставит ${bet} bb (${b.label}). ` +
-    `Сколько процентов эквити нужно для прибыльного колла?`
-  return {
-    pot,
-    bet,
-    requiredPct: Math.round(required * 10) / 10,
-    ratioText,
-    prompt,
-    hint: `Формула: ставка / (банк + ставка + ваш колл) = ${bet} / (${pot} + ${bet} + ${bet})`,
-  }
-}
-
-export function genRatioQuestion(): MathQuestion {
-  const ratioNum = pick([0.5, 1, 1.5, 2, 2.5, 3, 4])
-  const required = (1 / (ratioNum + 1)) * 100
-  return {
-    pot: 0,
-    bet: 0,
-    requiredPct: Math.round(required * 10) / 10,
-    ratioText: `${fmtRatio(ratioNum)}:1`,
-    prompt: `Шансы банка составляют ${fmtRatio(ratioNum)}:1. Какой процент эквити нужен для колла?`,
-    hint: `Формула: 1 / (a + 1) × 100%, где a — шансы банка.`,
-  }
-}
-
 function fmtRatio(x: number): string {
   return x === Math.round(x) ? String(Math.round(x)) : String(Math.round(x * 10) / 10)
 }
 
-export function checkMathAnswer(q: MathQuestion, answer: number): boolean {
-  return Math.abs(answer - q.requiredPct) <= 1.5
+function r1(x: number): number {
+  return Math.round(x * 10) / 10
 }
 
-// ============ 2. АУТСЫ ============
+/** Требуемое эквити для прибыльного колла по размеру ставки */
+export function genMathQuestion(): MathQuestion {
+  const pot = pick([40, 60, 80, 100, 120, 160, 200])
+  const b = pick(POT_ODDS_BETS)
+  const bet = Math.round((pot * b.mult) / 10) * 10
+  const requiredPct = r1((bet / (pot + 2 * bet)) * 100)
+  const ratio = (pot + bet) / bet
+  return {
+    kind: 'potOdds',
+    prompt:
+      `Банк — ${pot} bb. Оппонент ставит ${bet} bb (${b.label}). ` +
+      `Сколько процентов эквити нужно для прибыльного колла?`,
+    hint: `Формула: ставка / (банк + ставка + ваш колл) = ${bet} / (${pot} + ${bet} + ${bet})`,
+    answer: requiredPct,
+    unit: '%',
+    tolerance: 1.5,
+    solutionText: `требуемое эквити ≈ ${requiredPct}% (шансы банка ${fmtRatio(ratio)}:1)`,
+  }
+}
+
+/** Шансы банка в формате a:1 → требуемое эквити */
+export function genRatioQuestion(): MathQuestion {
+  const ratioNum = pick([0.5, 1, 1.5, 2, 2.5, 3, 4])
+  const required = r1((1 / (ratioNum + 1)) * 100)
+  return {
+    kind: 'ratio',
+    prompt: `Шансы банка составляют ${fmtRatio(ratioNum)}:1. Какой процент эквити нужен для колла?`,
+    hint: `Формула: 1 / (a + 1) × 100%, где a — шансы банка.`,
+    answer: required,
+    unit: '%',
+    tolerance: 1.5,
+    solutionText: `нужно ${required}% эквити (1 / (${fmtRatio(ratioNum)} + 1) × 100%)`,
+  }
+}
+
+/** Правило 2 и 4: аутсы → примерный шанс улучшения */
+const RULE24_OUTS = [3, 4, 5, 6, 7, 8, 9, 10, 12, 15]
+
+export function genRule24Question(): MathQuestion {
+  const outs = pick(RULE24_OUTS)
+  const flop = Math.random() < 0.6
+  const factor = flop ? 4 : 2
+  const answer = outs * factor
+  return {
+    kind: 'rule24',
+    prompt: flop
+      ? `Вы на флопе и у вас ${outs} аутсов. Какой примерно шанс улучшиться до ривера по правилу 2 и 4?`
+      : `Вы на терне и у вас ${outs} аутсов. Какой примерно шанс улучшиться на ривере по правилу 2 и 4?`,
+    hint: flop ? `Правило 4: аутсы × 4 = ${outs} × 4` : `Правило 2: аутсы × 2 = ${outs} × 2`,
+    answer,
+    unit: '%',
+    tolerance: 2,
+    solutionText: flop ? `≈ ${outs} × 4 = ${answer}% (две улицы)` : `≈ ${outs} × 2 = ${answer}% (одна улица)`,
+  }
+}
+
+const MATH_POTS = [40, 60, 80, 100, 120, 160]
+const BET_FRACTIONS: Array<{ label: string; mult: number }> = [
+  { label: 'треть банка', mult: 1 / 3 },
+  { label: 'половину банка', mult: 0.5 },
+  { label: '2/3 банка', mult: 2 / 3 },
+  { label: '3/4 банка', mult: 0.75 },
+  { label: 'размер банка', mult: 1 },
+]
+
+function betOf(pot: number, f: { mult: number }): number {
+  return Math.max(10, Math.round((pot * f.mult) / 5) * 5)
+}
+
+/** Минимальное фолд-эквити безубыточного чистого блефа */
+export function genBluffBreakevenQuestion(): MathQuestion {
+  const pot = pick(MATH_POTS)
+  const b = pick(BET_FRACTIONS)
+  const bet = betOf(pot, b)
+  const required = r1((bet / (pot + bet)) * 100)
+  return {
+    kind: 'bluffBreakeven',
+    prompt: `Банк — ${pot} bb. Вы ставите ${bet} bb как чистый блеф (${b.label}). Какой процент фолдов соперника нужен, чтобы блеф окупался сразу?`,
+    hint: `Формула: ставка / (банк + ставка) = ${bet} / (${pot} + ${bet})`,
+    answer: required,
+    unit: '%',
+    tolerance: 1.5,
+    solutionText: `нужны фолды ≥ ${required}% (${bet} / (${pot} + ${bet}))`,
+  }
+}
+
+/** MDF — минимальная частота защиты против ставки */
+export function genMdfQuestion(): MathQuestion {
+  const pot = pick(MATH_POTS)
+  const b = pick(BET_FRACTIONS)
+  const bet = betOf(pot, b)
+  const mdf = r1((pot / (pot + bet)) * 100)
+  return {
+    kind: 'mdf',
+    prompt: `Банк — ${pot} bb. Оппонент ставит ${bet} bb (${b.label}). Какой минимальный процент рук нужно защищать (MDF), чтобы его блефы не были автоприбыльными?`,
+    hint: `MDF = банк / (банк + ставка) = ${pot} / (${pot} + ${bet})`,
+    answer: mdf,
+    unit: '%',
+    tolerance: 1.5,
+    solutionText: `MDF ≈ ${mdf}% (${pot} / (${pot} + ${bet}))`,
+  }
+}
+
+/** EV чистого блефа при заданном фолд-эквити */
+const BLUFF_FOLD_PCTS = [30, 40, 50, 60, 70]
+
+export function genBluffEvQuestion(): MathQuestion {
+  const pot = pick([40, 60, 80, 100, 120])
+  const betMult = pick([0.5, 0.75, 1])
+  const bet = Math.round((pot * betMult) / 5) * 5
+  const foldPct = pick(BLUFF_FOLD_PCTS)
+  const f = foldPct / 100
+  const ev = r1(f * pot - (1 - f) * bet)
+  return {
+    kind: 'bluffEv',
+    prompt: `Банк — ${pot} bb. Вы блефуете на ${bet} bb, соперник сдаётся в ${foldPct}% случаев. Чему равен EV блефа?`,
+    hint: `EV = фолд-эквити × банк − (1 − фолд-эквити) × ставка = ${f} × ${pot} − ${(1 - f).toFixed(2)} × ${bet}`,
+    answer: ev,
+    unit: 'bb',
+    tolerance: 1,
+    solutionText: `EV = ${f.toFixed(2)} × ${pot} − ${(1 - f).toFixed(2)} × ${bet} = ${ev > 0 ? '+' : ''}${ev} bb`,
+  }
+}
+
+/** Число комбинаций стартовых рук на префлопе */
+const COMBO_TASKS: Array<{ hand: string; answer: number; why: string }> = [
+  { hand: 'AA', answer: 6, why: 'карманная пара: 4 × 3 / 2 = 6 комбинаций' },
+  { hand: '77', answer: 6, why: 'карманная пара: 4 × 3 / 2 = 6 комбинаций' },
+  { hand: 'QQ', answer: 6, why: 'карманная пара: 4 × 3 / 2 = 6 комбинаций' },
+  { hand: 'AK', answer: 16, why: '4 аса × 4 короля = 16: 12 разномастных + 4 одномастные' },
+  { hand: 'AKs', answer: 4, why: 'одномастные: по одной комбинации на каждую масть' },
+  { hand: 'AKo', answer: 12, why: 'разномастные: 4 × 3 = 12' },
+  { hand: 'T9s', answer: 4, why: 'одномастные: по одной комбинации на каждую масть' },
+  { hand: 'A5o', answer: 12, why: 'разномастные: 4 × 3 = 12' },
+]
+
+export function genCombosQuestion(): MathQuestion {
+  const t = pick(COMBO_TASKS)
+  return {
+    kind: 'combos',
+    prompt: `Сколько комбинаций стартовых рук у ${t.hand} на префлопе (полная колода 52 карты)?`,
+    hint: t.why,
+    answer: t.answer,
+    unit: 'шт',
+    tolerance: 0.2,
+    solutionText: `${t.hand} — ${t.answer} комбинаций (${t.why})`,
+  }
+}
+
+/** SPR — соотношение эффективного стека к банку */
+const SPR_POTS = [10, 15, 20, 25, 30, 40, 50]
+const SPR_STACKS = [50, 75, 100, 150]
+
+export function genSprQuestion(): MathQuestion {
+  const pot = pick(SPR_POTS)
+  const stacks = SPR_STACKS.filter((s) => s > pot * 1.2)
+  const stack = pick(stacks)
+  const spr = r1(stack / pot)
+  return {
+    kind: 'spr',
+    prompt: `Эффективный стек — ${stack} bb, банк — ${pot} bb. Какой SPR (стек / банк)?`,
+    hint: `SPR = эффективный стек / банк = ${stack} / ${pot}`,
+    answer: spr,
+    unit: '',
+    tolerance: 0.2,
+    solutionText: `SPR = ${stack} / ${pot} ≈ ${spr}`,
+  }
+}
+
+// ============ 2. АУТСЫ: РАСШИРЕННЫЙ БАНК СЦЕНАРИЕВ ============
 
 export interface OutsQuestion {
   hero: Card[]
@@ -89,37 +244,112 @@ export interface OutsQuestion {
   heroHandName: string
   villainHandName: string
   heroAheadNow: boolean
+  /** название типа сценария, например «Флеш-дро + гатшот» */
+  scenario: string
+  /** пояснение, показываемое после ответа */
+  note?: string
 }
 
-/** Генерация «классических» сценариев аутсов: флеш-дро (9), двусторонний стрит-дро (8), гатшот (4).
- *  Рука оппонента подобрана так, что точный подсчёт совпадает с классическим. */
-export function genOutsQuestion(): OutsQuestion {
-  const type = pick(['flush', 'oesd', 'gutshot'] as const)
-
-  if (type === 'flush') {
-    // Герой: Qs Js; доска: Ks 7s 2d; оппонент: пара тузов (Ac Ad).
-    // Аутсы = ровно 9 пик (флеш бьёт пару тузов/две пары), пары Q,J бьются о пару A.
-    const hero = [parse('Qs'), parse('Js')]
-    const board = [parse('Ks'), parse('7s'), parse('2d')]
-    const villain = [parse('Ac'), parse('Ad')]
-    return buildOuts(hero, villain, board, 'flop')
-  }
-  if (type === 'oesd') {
-    // Герой: Jh Th; доска: 8c 9d 2s; оппонент: сет девяток (9h 9s).
-    // Аутсы = ровно 8: четыре дамы + четыре семёрки (стрит бьёт сет), пары J,T бьются о сет.
-    const hero = [parse('Jh'), parse('Th')]
-    const board = [parse('8c'), parse('9d'), parse('2s')]
-    const villain = [parse('9h'), parse('9s')]
-    return buildOuts(hero, villain, board, 'flop')
-  }
-  // gutshot
-  // Герой: 8h 7h; доска: Td Jc 2s; оппонент: пара дам (Qd Qc).
-  // Аутсы = ровно 4 девятки (стрит 7-8-9-T-J), пары 8,7 бьются о пару Q.
-  const hero = [parse('8h'), parse('7h')]
-  const board = [parse('Td'), parse('Jc'), parse('2s')]
-  const villain = [parse('Qd'), parse('Qc')]
-  return buildOuts(hero, villain, board, 'flop')
+interface OutsSpec {
+  scenario: string
+  note?: string
+  hero: [string, string]
+  villain: [string, string]
+  board: [string, string, string]
 }
+
+/** Банк сценариев аутсов: рука оппонента подобрана так, что точный подсчёт
+ *  (через evaluate7 + countOuts) совпадает с классическим правилом. */
+export const OUTS_SCENARIOS: OutsSpec[] = [
+  {
+    scenario: 'Флеш-дро',
+    hero: ['Qs', 'Js'],
+    villain: ['Ac', 'Ad'],
+    board: ['Ks', '7s', '2d'],
+  },
+  {
+    scenario: 'Двусторонний стрит-дро (OESD)',
+    hero: ['Jh', 'Th'],
+    villain: ['9h', '9s'],
+    board: ['8c', '9d', '2s'],
+  },
+  {
+    scenario: 'Гатшот',
+    hero: ['8h', '7h'],
+    villain: ['Qd', 'Qc'],
+    board: ['Td', 'Jc', '2s'],
+  },
+  {
+    scenario: 'Стрит-дро + флеш-дро (комбо-дро)',
+    note: '9 аутсов флеша + 8 аутсов стрита, но 6♠ и J♠ дают и то и другое — считаются один раз (итого 15).',
+    hero: ['9s', '8s'],
+    villain: ['Ac', 'Ad'],
+    board: ['Ts', '7d', '2s'],
+  },
+  {
+    scenario: 'Флеш-дро + гатшот',
+    note: '9 аутсов флеша + 3 не-пиковые семёрки для стрита (7♠ уже учтён во флеше) — итого 12.',
+    hero: ['Ts', '8s'],
+    villain: ['Ac', 'Ad'],
+    board: ['9s', '6s', '2d'],
+  },
+  {
+    scenario: 'Флеш-дро + две оверкарты',
+    note: '9 аутсов флеша + 3 аса + 3 короля (старшая пара бьёт карманных валетов) — итого 15.',
+    hero: ['As', 'Ks'],
+    villain: ['Jc', 'Jd'],
+    board: ['Ts', '7s', '2d'],
+  },
+  {
+    scenario: 'Двойной гатшот',
+    note: 'Оставшиеся дамы и все семёрки достраивают стрит, который бьёт сет дам (2 + 4 = 6).',
+    hero: ['Jh', '9h'],
+    villain: ['Qc', 'Qd'],
+    board: ['Th', '8d', '2c'],
+  },
+  {
+    scenario: 'Две оверкарты',
+    note: '3 аса + 3 короля дают старшую пару против карманных дам: 6 аутсов.',
+    hero: ['Ah', 'Kh'],
+    villain: ['Qc', 'Qd'],
+    board: ['7c', '3d', '2h'],
+  },
+  {
+    scenario: 'Одна оверкарта',
+    note: 'Только 3 аса бьют пару валетов: ваш туз в руке, а десятка младше валетов.',
+    hero: ['Ac', 'Td'],
+    villain: ['Jh', 'Js'],
+    board: ['7c', '3d', '2h'],
+  },
+  {
+    scenario: 'Сет под готовым флешем',
+    note: 'Пара на доске (шестёрка или двойка) даёт фулл-хаус, 9♣ — каре: 7 аутсов.',
+    hero: ['9h', '9d'],
+    villain: ['As', 'Ks'],
+    board: ['9s', '6s', '2s'],
+  },
+  {
+    scenario: 'Две пары под флешем',
+    note: 'Только оставшиеся асы и короли превращают две пары в фулл-хаус; пара тройки на доске — нет (4 аутса).',
+    hero: ['Ah', 'Kd'],
+    villain: ['5c', '4c'],
+    board: ['Ac', 'Kc', '3c'],
+  },
+  {
+    scenario: 'Карманная пара → сет',
+    note: 'Оставшиеся две восьмёрки дают сет против пары асов: 2 аутса. Пары на доске дают лишь две младшие пары.',
+    hero: ['8h', '8d'],
+    villain: ['Ah', 'Ad'],
+    board: ['9s', '3c', '2d'],
+  },
+  {
+    scenario: 'Флеш-дро против сета (отравленный аутс)',
+    note: 'Из 9 пиковых аутсов один — 9♠ — даёт оппоненту каре и не считается: чистых аутсов 8.',
+    hero: ['As', 'Js'],
+    villain: ['9c', '9h'],
+    board: ['Ks', '9d', '3s'],
+  },
+]
 
 function parse(code: string): Card {
   const c = parseCard(code)
@@ -127,7 +357,11 @@ function parse(code: string): Card {
   return c
 }
 
-function buildOuts(hero: Card[], villain: Card[], board: Card[], street: 'flop' | 'turn'): OutsQuestion {
+export function genOutsQuestion(): OutsQuestion {
+  const spec = pick(OUTS_SCENARIOS)
+  const hero = spec.hero.map(parse)
+  const villain = spec.villain.map(parse)
+  const board = spec.board.map(parse)
   const { outs, heroAheadNow } = countOuts(hero, villain, board)
   const heroRes = evaluate7([...hero, ...board])
   const vilRes = evaluate7([...villain, ...board])
@@ -137,10 +371,12 @@ function buildOuts(hero: Card[], villain: Card[], board: Card[], street: 'flop' 
     board,
     outs,
     outsCount: outs.length,
-    street,
+    street: 'flop',
     heroHandName: handName(heroRes),
     villainHandName: handName(vilRes),
     heroAheadNow,
+    scenario: spec.scenario,
+    note: spec.note,
   }
 }
 
@@ -160,7 +396,7 @@ export function describeOuts(outs: Card[]): string {
   return parts.join(', ')
 }
 
-// ============ 3. EV ТРЕНАЖЁР ============
+// ============ 3. EV ТРЕНАЖЁР: ВЫБОР ИЗ 5 ЗНАЧЕНИЙ ============
 
 export interface EvQuestion {
   pot: number
@@ -168,26 +404,61 @@ export interface EvQuestion {
   equityPct: number
   evCall: number
   correctAction: 'call' | 'fold'
+  /** 5 значений EV для выбора, ровно одно верное */
+  options: number[]
 }
 
+const EV_POTS = [45, 55, 70, 85, 95, 115, 135, 165]
+const EV_BET_MULTS = [0.4, 0.5, 0.6, 0.75, 1]
+
 export function genEvQuestion(): EvQuestion {
-  const pot = pick([60, 80, 100, 120, 160, 200, 240])
-  const betMult = pick([0.5, 0.75, 1])
-  const bet = Math.round((pot * betMult) / 5) * 5
+  const pot = pick(EV_POTS)
+  const betMult = pick(EV_BET_MULTS)
+  const bet = Math.max(10, Math.round(pot * betMult))
   const required = bet / (pot + 2 * bet)
   // генерируем эквити рядом с порогом, чтобы решение было нетривиальным
-  const delta = (Math.random() * 0.22 - 0.11)
+  const delta = Math.random() * 0.22 - 0.11
   const equity = Math.min(0.95, Math.max(0.05, required + delta))
   const equityPct = Math.round(equity * 1000) / 10
   const eq = equityPct / 100
-  const evCall = eq * (pot + bet) - (1 - eq) * bet
+  const evCall = r1(eq * (pot + bet) - (1 - eq) * bet)
   return {
     pot,
     bet,
     equityPct,
-    evCall: Math.round(evCall * 10) / 10,
+    evCall,
     correctAction: evCall > 0 ? 'call' : 'fold',
+    options: buildEvOptions(evCall),
   }
+}
+
+/** 5 значений EV: верное + 4 правдоподобные ловушки (перепутанный знак,
+ *  соседние значения, грубая оценка). */
+function buildEvOptions(correct: number): number[] {
+  const seen = new Set<string>([correct.toFixed(1)])
+  const variants: number[] = [correct]
+  let attempts = 0
+  while (variants.length < 5 && attempts < 200) {
+    attempts++
+    const mode = attempts % 4
+    let v: number
+    if (mode === 1) v = correct + 2 + Math.random() * 6
+    else if (mode === 2) v = correct - 2 - Math.random() * 6
+    else if (mode === 3) v = -correct + (Math.random() * 8 - 4)
+    else v = correct + (8 + Math.random() * 12) * (Math.random() < 0.5 ? 1 : -1)
+    const rounded = r1(v)
+    const key = rounded.toFixed(1)
+    if (!seen.has(key)) {
+      seen.add(key)
+      variants.push(rounded)
+    }
+  }
+  // Фишер–Йетс
+  for (let i = variants.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[variants[i], variants[j]] = [variants[j], variants[i]]
+  }
+  return variants
 }
 
 export function evFormulaText(q: EvQuestion): string {

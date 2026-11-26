@@ -20,9 +20,9 @@ interface ModeCard {
 
 const MODES: ModeCard[] = [
   { id: 'sim', title: 'Симулятор раздач', desc: 'Решения на префлопе и постфлопе с разбором', icon: Zap, trainer: 'sim' },
-  { id: 'math', title: 'Математика', desc: 'Пот-оддсы и требуемое эквити', icon: Sigma, trainer: 'math' },
-  { id: 'outs', title: 'Аутсы и эквити', desc: 'Считайте карты, дающие победу', icon: Target, trainer: 'outs' },
-  { id: 'ev', title: 'EV-тренажёр', desc: 'Колл или фолд по ожидаемой стоимости', icon: Percent, trainer: 'ev' },
+  { id: 'math', title: 'Математика', desc: 'Пот-оддсы, правило 2 и 4, MDF, SPR, комбинации и блефы', icon: Sigma, trainer: 'math' },
+  { id: 'outs', title: 'Аутсы и эквити', desc: '13 сценариев: от флеш-дро до отравленных аутсов', icon: Target, trainer: 'outs' },
+  { id: 'ev', title: 'EV-тренажёр', desc: 'Найдите верный EV колла из пяти вариантов', icon: Percent, trainer: 'ev' },
   { id: 'winner', title: 'Кто победил?', desc: 'Определяйте выигрышную руку', icon: Swords, trainer: 'winner' },
   { id: 'combo', title: 'Какая комбинация?', desc: 'Узнавайте силу собранной руки', icon: Layers, trainer: 'combo' },
   { id: 'omaha', title: 'Омаха классическая', desc: '4 карты руки: ровно 2 + 3 с доски — кто победил?', icon: Spade, trainer: 'omaha' },
