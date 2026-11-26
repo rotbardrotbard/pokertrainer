@@ -1,8 +1,9 @@
 'use client'
 
 // Главная: режимы тренировки, статистика, серия дней
-import { Flame, Zap, Sigma, Target, Percent, Swords, Layers, Grid3x3, Calculator, Trophy, ShieldCheck, Spade, Copy, SquareStack, Shuffle, Dices, Compass, BookOpen } from 'lucide-react'
+import { Flame, Zap, Sigma, Target, Percent, Swords, Layers, Grid3x3, Calculator, Trophy, ShieldCheck, Spade, Copy, SquareStack, Shuffle, Dices, Compass, BookOpen, RotateCcw } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { TrainerId, useStats, accuracy } from '@/store/stats'
 import { PlayingCard, CardRow } from './PlayingCard'
 import { parseCard } from '@/lib/poker/cards'
@@ -40,6 +41,7 @@ export function HomeView({ onSelect }: { onSelect: (v: ViewId) => void }) {
   const stats = useStats((s) => s.stats)
   const streak = useStats((s) => s.streak)
   const bestStreak = useStats((s) => s.bestStreak)
+  const resetAll = useStats((s) => s.resetAll)
 
   const totalAttempts = Object.values(stats).reduce((a, t) => a + t.attempts, 0)
   const totalCorrect = Object.values(stats).reduce((a, t) => a + t.correct, 0)
@@ -74,6 +76,37 @@ export function HomeView({ onSelect }: { onSelect: (v: ViewId) => void }) {
             Точность: {overall === null ? '—' : `${overall}%`}
             {totalAttempts > 0 && <span className="text-stone-500"> ({totalAttempts} ответов)</span>}
           </span>
+          {totalAttempts > 0 && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center gap-1.5 text-stone-500 hover:text-red-400 transition"
+                  aria-label="Сбросить статистику"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Сброс
+                </button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Сбросить всю статистику?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Будут удалены ответы по всем режимам, статистика по типам задач и серия дней. Действие необратимо.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Отмена</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={resetAll}
+                    className="bg-red-600 text-white hover:bg-red-500"
+                  >
+                    Сбросить
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
       </section>
 
