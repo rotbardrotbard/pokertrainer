@@ -7,6 +7,7 @@ import { simulateEquity, countOuts } from './equity'
 import {
   Position, openRangeClassesFor, vsRaiseCharts, handClass, handInSet,
   rangePercent, topPercentClasses, POSITION_NAMES_RU, classesToCombos,
+  holdemActionFrequencies, dominantAction, secondaryAction, freqAggregate, freqLabel,
 } from './ranges'
 
 const rand: () => number = Math.random
@@ -550,12 +551,25 @@ export interface SimScenarioBase {
   prompt: string
   actionLabels: { fold: string; call: string | null; raise: string }
   correctAction: SimAction
+  altAction?: SimAction // второе действие смешанной стратегии (тоже засчитывается)
+  altFreq?: number // частота второго действия, %
   explanation: string
   detail: string[]
   pot: number
   bet: number
   stack: number
 }
+
+/** Засчитывается ли ответ: основное действие или допустимый микс-альтернатива. */
+export function isSimActionCorrect(
+  sc: { correctAction: SimAction; altAction?: SimAction },
+  a: SimAction | null,
+): boolean {
+  if (a === null) return false
+  return a === sc.correctAction || (sc.altAction !== undefined && a === sc.altAction)
+}
+
+const SIM_ALT_LABEL: Record<SimAction, string> = { raise: '3бет', call: 'колл', fold: 'фолд' }
 
 /** Префлоп: открытие из позиции */
 export function genOpenScenario(): SimScenarioBase {
@@ -586,7 +600,7 @@ export function genOpenScenario(): SimScenarioBase {
   }
 }
 
-/** Префлоп: против рейза — чарт зависит и от позиции защитника, и от позиции рейзера */
+/** Префлоп: против рейза — чарт зависит и от позиции защитника, и от позиции рейзера; оценка по смешанным частотам GTO */
 export function genVsRaiseScenario(): SimScenarioBase {
   const order: Position[] = ['UTG', 'MP', 'CO', 'BTN', 'SB', 'BB']
   const heroIdx = 1 + ri(5) // MP..BB
@@ -597,13 +611,31 @@ export function genVsRaiseScenario(): SimScenarioBase {
   const hero = [deck[0], deck[1]]
   const chart = vsRaiseCharts(heroPos, villainPos, 6)
   const cls = handClass(hero[0], hero[1])
+  const freqs = holdemActionFrequencies(heroPos, villainPos, 6)
+  const f = freqs?.get(cls) ?? null
   const isThreeBet = chart ? chart.threeBet.has(cls) : false
   const isCall = chart ? !isThreeBet && chart.call.has(cls) : false
   const openSize = 2.5
-  const correctAction: SimAction = isThreeBet ? 'raise' : isCall ? 'call' : 'fold'
-  const raiseLabel = isThreeBet
+  // основное действие — с наибольшей частотой; второе с частотой ≥ 25% тоже засчитывается
+  let correctAction: SimAction
+  let altAction: SimAction | undefined
+  let altFreq: number | undefined
+  if (f) {
+    correctAction = dominantAction(f)
+    const sec = secondaryAction(f, 25)
+    if (sec) {
+      altAction = sec.action
+      altFreq = sec.freq
+    }
+  } else {
+    correctAction = isThreeBet ? 'raise' : isCall ? 'call' : 'fold'
+  }
+  const raiseLabel = correctAction === 'raise'
     ? `3бет до ${openSize * 3}bb`
     : 'Рейз (3бет)'
+  const mixNote = altAction !== undefined
+    ? ` Смешанная стратегия: допустимо и «${SIM_ALT_LABEL[altAction]}» (~${altFreq}%).`
+    : ''
   return {
     kind: 'vsRaise',
     hero,
@@ -611,17 +643,24 @@ export function genVsRaiseScenario(): SimScenarioBase {
     prompt: `${villainPos} открывается рейзом до ${openSize}bb. Вы на ${heroPos}. Ваше действие?`,
     actionLabels: { fold: 'Фолд', call: `Колл ${openSize}bb`, raise: raiseLabel },
     correctAction,
-    explanation: isThreeBet
-      ? `${cls} — премиум-рука: делайте 3бет для вэлью и инициативы.`
-      : isCall
-        ? `${cls} — играбельная рука: колл против открытия с ${villainPos} (${heroPos === 'SB' || heroPos === 'BB' ? 'без позиции' : 'в позиции'}).`
+    altAction,
+    altFreq,
+    explanation: correctAction === 'raise'
+      ? `${cls} — премиум/микс-рука: чаще 3бет для вэлью и инициативы.${mixNote}`
+      : correctAction === 'call'
+        ? `${cls} — играбельная рука: колл против открытия с ${villainPos} (${heroPos === 'SB' || heroPos === 'BB' ? 'без позиции' : 'в позиции'}).${mixNote}`
         : `${cls} — слабее диапазона защиты ${heroPos} против открытия с ${villainPos}: сбрасывайте.`,
     detail: [
-      chart
-        ? `Защита ${heroPos} против ${villainPos}: 3бет ≈ топ ${chart.threeBetPct.toFixed(0)}%, колл ≈ топ ${chart.callPct.toFixed(0)}% рук.`
-        : 'Чарт защиты недоступен для этой пары позиций.',
+      f
+        ? `Частоты GTO для ${cls}: ${freqLabel(f)}.`
+        : chart
+          ? `Защита ${heroPos} против ${villainPos}: 3бет ≈ топ ${chart.threeBetPct.toFixed(0)}%, колл ≈ топ ${chart.callPct.toFixed(0)}% рук.`
+          : 'Чарт защиты недоступен для этой пары позиций.',
+      freqs
+        ? `Соотношение действий всего диапазона: 3бет ${freqAggregate(freqs).raise.toFixed(0)}% / колл ${freqAggregate(freqs).call.toFixed(0)}% / фолд ${freqAggregate(freqs).fold.toFixed(0)}%.`
+        : 'Соотношение действий недоступно.',
       `Ширина защиты зависит от позиции рейзера: против поздних открытий (CO/BTN) коллы заметно шире, чем против UTG/MP.`,
-      'Премиум-руки 3бетят, спекулятивные — коллируют, мусор — фолд.',
+      'Пограничные руки играются смешанно: у солвера часть комбинаций делает одно действие, часть — другое.',
     ],
     pot: 1.5 + openSize,
     bet: openSize,

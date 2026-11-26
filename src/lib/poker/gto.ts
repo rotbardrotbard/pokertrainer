@@ -5,9 +5,9 @@
 // чарты защиты против рейза (ширина защиты зависит от позиции рейзера).
 // Постфлоп: план с размерами ставок, смешанными частотами, учётом текстуры
 // доски и границами колл/фолд против конкретных размеров ставок.
-import { openRangeClassesFor, vsRaiseCharts, DEFAULT_RAISER, openPercentFor, SIZE_DEF_FACTOR, rangePercent } from './ranges'
-import type { Position } from './ranges'
-import { omahaRangeThreshold, handInRange, HOLE_COUNT } from './handRanges'
+import { openRangeClassesFor, vsRaiseCharts, DEFAULT_RAISER, openPercentFor, SIZE_DEF_FACTOR, rangePercent, holdemActionFrequencies, freqAggregate, mixExamples, freqLabel } from './ranges'
+import type { Position, ActionFreq } from './ranges'
+import { omahaRangeThreshold, omahaHandPercentile, handInRange, HOLE_COUNT } from './handRanges'
 import type { GameKind } from './handRanges'
 import type { Card } from './cards'
 
@@ -74,25 +74,34 @@ export interface HoldemPreflop {
   raisePct: number
   callPct: number
   mode: 'open' | 'vsraise'
+  freq: Map<string, ActionFreq> // смешанные частоты действий по классам (пусто для открытия)
 }
 
 /**
  * Чарт префлопа для позиции, размера стола и ситуации.
  * В ситуации «против рейза» ширина защиты зависит от позиции рейзера:
  * BB против BTN/SB защищается в 1,5–2 раза шире, чем против UTG.
+ * Дополнительно возвращает смешанные частоты действий (как в GTO-солвере).
  */
 export function holdemPreflop(pos: Position, players: number, situation: 'open' | 'vsraise', callers: number, raiser?: Position): HoldemPreflop {
   if (situation === 'open') {
     const set = openRangeClassesFor(pos, players)
-    return { raise: set, call: new Set(), raisePct: rangePercent(set), callPct: 0, mode: 'open' }
+    return { raise: set, call: new Set(), raisePct: rangePercent(set), callPct: 0, mode: 'open', freq: new Map() }
   }
   const rp = raiser && raiser !== pos ? raiser : DEFAULT_RAISER[pos] ?? 'CO'
   const multiFactor = Math.max(0.45, 1 - 0.1 * callers)
   const chart = vsRaiseCharts(pos, rp, players, multiFactor)
   if (!chart) {
-    return { raise: new Set(), call: new Set(), raisePct: 0, callPct: 0, mode: 'vsraise' }
+    return { raise: new Set(), call: new Set(), raisePct: 0, callPct: 0, mode: 'vsraise', freq: new Map() }
   }
-  return { raise: chart.threeBet, call: chart.call, raisePct: chart.threeBetPct, callPct: chart.callPct, mode: 'vsraise' }
+  return {
+    raise: chart.threeBet,
+    call: chart.call,
+    raisePct: chart.threeBetPct,
+    callPct: chart.callPct,
+    mode: 'vsraise',
+    freq: holdemActionFrequencies(pos, rp, players, multiFactor) ?? new Map(),
+  }
 }
 
 export function holdemAction(cls: string, chart: HoldemPreflop): 'raise' | 'call' | 'fold' {
@@ -199,6 +208,40 @@ export function omahaAction(game: 'omaha4' | 'omaha5', hand: Card[], chart: Omah
   if (handInRange(game, hand, chart.threeBetPercent)) return 'raise'
   if (handInRange(game, hand, chart.callPercent)) return 'call'
   return 'fold'
+}
+
+// ---------- Префлоп: Омаха, частотные смеси ----------
+
+/** Полуширина зоны смешения у границ диапазона, % стартовых рук. */
+const OMAHA_MIX_BAND = 3
+
+/**
+ * Плавное смешение у границы «топ N%»: 100% внутри, линейный спад до 0 в зоне ±band.
+ * Возвращает частоту первого действия (рейз или колл) у соответствующей границы.
+ */
+function omahaBlend(boundary: number, p: number): number {
+  if (p <= boundary - OMAHA_MIX_BAND) return 100
+  if (p >= boundary + OMAHA_MIX_BAND) return 0
+  const t = (boundary + OMAHA_MIX_BAND - p) / (2 * OMAHA_MIX_BAND)
+  return Math.round(100 * t)
+}
+
+/**
+ * Частоты действий для конкретной руки Омахи (как в GTO-солвере):
+ * у границы 3бета частота плавно переходит от рейза к коллу, у границы колла — от колла к фолду.
+ * p — место руки («топ X%»): чем меньше, тем сильнее рука.
+ */
+export function omahaActionFreqs(game: 'omaha4' | 'omaha5', hand: Card[], chart: OmahaPreflop, situation: 'open' | 'vsraise'): ActionFreq {
+  const p = omahaHandPercentile(game, hand)
+  if (situation === 'open') {
+    const raise = omahaBlend(chart.openPercent, p)
+    return { raise, call: 0, fold: 100 - raise }
+  }
+  const raise = omahaBlend(chart.threeBetPercent, p)
+  const rest = 100 - raise
+  const callShare = omahaBlend(chart.callPercent, p) // 100 внутри колл-зоны, 0 за её пределами
+  const call = Math.round((rest * callShare) / 100)
+  return { raise, call, fold: 100 - raise - call }
 }
 
 // ---------- Постфлоп: текстура доски ----------
@@ -738,9 +781,19 @@ export function preflopNotes(game: GameKind, pos: Position, situation: 'open' | 
     } else {
       const rp = raiser && raiser !== pos ? raiser : DEFAULT_RAISER[pos] ?? 'CO'
       const chart = holdemPreflop(pos, players, 'vsraise', callers, rp)
-      notes.push(`Против открытия с ${rp} за столом ${players}-max: 3бет ≈ топ ${chart.raisePct.toFixed(0)}% рук, колл ≈ топ ${chart.callPct.toFixed(0)}%.`)
+      const freq = holdemActionFrequencies(pos, rp, players, Math.max(0.45, 1 - 0.1 * callers))
+      if (freq && freq.size > 0) {
+        const agg = freqAggregate(freq)
+        notes.push(`Против открытия с ${rp} за столом ${players}-max: соотношение действий по частотам — 3бет ${agg.raise.toFixed(0)}% / колл ${agg.call.toFixed(0)}% / фолд ${agg.fold.toFixed(0)}% всех рук.`)
+        const ex = mixExamples(freq, 2)
+        if (ex.length > 0) {
+          notes.push(`Пограничные руки играются смешанно: ${ex.map((e) => `${e.cls} — ${freqLabel(e.f)}`).join(' · ')}.`)
+        }
+      } else {
+        notes.push(`Против открытия с ${rp} за столом ${players}-max: 3бет ≈ топ ${chart.raisePct.toFixed(0)}% рук, колл ≈ топ ${chart.callPct.toFixed(0)}%.`)
+      }
       notes.push('Ширина защиты зависит от позиции рейзера: BB против BTN/SB коллирует примерно в 1,5–2 раза больше рук, чем против UTG.')
-      notes.push('Против рейза: премиум — 3бет, играбельные — колл, остальное — фолд.')
+      notes.push('Против рейза: премиум — 3бет, играбельные — колл, пограничные — микс, слабые — фолд.')
       if (callers > 0) notes.push(`Рейз уже поддержали ${callers} ${callers === 1 ? 'игрок' : 'игрока'}: коллы требуют более сильных рук, мультпот — для натс-потенциала.`)
       if (pos === 'BB') notes.push('BB защищается шире всех — колл со скидкой блайнда.')
       if (pos === 'BTN') notes.push('С баттона против рейза много коллов в позиции и 3беты с премиумом.')
@@ -759,6 +812,7 @@ export function preflopNotes(game: GameKind, pos: Position, situation: 'open' | 
       notes.push(`Против открытия с ${rp} за столом ${players}-max: 3бет ≈ топ ${chart.threeBetPercent.toFixed(0)}%, колл ≈ топ ${chart.callPercent.toFixed(0)}%.`)
       notes.push('Ширина защиты зависит от позиции рейзера: против поздних открытий (BTN/SB) коллы в 1,5–1,7 раза шире, чем против UTG.')
       notes.push('Против рейза в Омахе: 3бет — только премиум (AAxx, AKQJ ds, высокие связки), играбельное — колл, слабое — фолд.')
+      notes.push('У границ 3бет/колл и колл/фолд частоты плавно смешаны (зона ±3% диапазона): пограничная рука — например «3бет 50% / колл 50%».')
       if (callers > 0) notes.push(`В банке уже ${callers + 1} ${callers + 1 === 1 ? 'игрок' : 'игроков'}: коллируйте руки с натс-потенциалом, маргинальные — фолд.`)
       if (pos === 'BB') notes.push('BB защищается шире всех: скидка блайнда делает колл прибыльным.')
       notes.push('Изолированные тузы (AAxx без мастей/связок) в Омахе — рука «на один постфлоп»: не переоценивайте их.')

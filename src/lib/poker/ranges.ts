@@ -416,6 +416,172 @@ export function validRaisersFor(defender: Position): Position[] {
   return order.slice(0, order.indexOf(defender))
 }
 
+// ---------- Частотные смеси (как в GTO-солвере) ----------
+
+/** Частоты действий для одной руки, % (сумма всегда 100). */
+export interface ActionFreq {
+  raise: number
+  call: number
+  fold: number
+}
+
+/**
+ * Таблица смешанных частот по паре «защитник × рейзер» (ориентир — 6-max, HU-пот).
+ * Формат: 'рука:3бет-колл' (%), фолд = остаток до 100. Запись применяется,
+ * только если рука есть в чарте (3бет или колл) — иначе стратегия остаётся чистой.
+ */
+const MIX_SPECS: Partial<Record<Position, Partial<Record<Position, string>>>> = {
+  UTG: {
+    UTG: 'JJ:25-75,TT:15-85,AKs:80-20,AQs:20-80,AJs:10-90,A5s:40-60,99:10-90,88:5-95',
+  },
+  MP: {
+    UTG: 'JJ:25-75,TT:15-85,AKs:80-20,AQs:20-80,AJs:10-90,A5s:45-55,A4s:40-60,99:10-90,88:5-95',
+  },
+  CO: {
+    UTG: 'JJ:30-70,TT:15-85,AKs:80-20,AQs:25-75,AJs:10-90,A5s:55-45,A4s:50-50,KQs:20-80,KJs:10-90,99:10-90,88:5-95',
+    MP: 'JJ:30-70,TT:20-80,AKs:85-15,AQs:30-70,AJs:15-85,A5s:60-40,A4s:55-45,KQs:25-75,KJs:15-85,99:10-90,88:5-95',
+  },
+  BTN: {
+    UTG: 'JJ:35-65,TT:20-80,AKs:85-15,AQs:35-65,AJs:15-85,A5s:60-40,A4s:55-45,KQs:30-70,KJs:15-85,QJs:10-90,99:15-85,88:10-90',
+    MP: 'JJ:35-65,TT:20-80,AKs:85-15,AQs:40-60,AJs:20-80,A5s:65-35,A4s:60-40,KQs:35-65,KJs:20-80,QJs:15-85,JTs:10-90,99:15-85,88:10-90',
+    CO: 'JJ:40-60,TT:25-75,99:20-80,88:15-85,AKs:90-10,AQs:40-60,AJs:20-80,ATs:10-90,A5s:65-35,A4s:60-40,A3s:15-85,KQs:40-60,KJs:25-75,QJs:20-80,QTs:10-90,JTs:15-85,AQo:25-70,AJo:0-85',
+  },
+  SB: {
+    UTG: 'QQ:80-20,JJ:40-60,TT:25-75,AKs:85-15,AQs:45-55,AJs:15-85,A5s:70-30,A4s:65-35,A3s:25-75,A2s:20-80,99:15-85,88:10-90',
+    MP: 'QQ:80-20,JJ:40-60,TT:25-75,AKs:85-15,AQs:45-55,AJs:15-85,A5s:70-30,A4s:65-35,A3s:30-70,A2s:25-75,KQs:30-70,KJs:15-85,99:15-85,88:10-90',
+    CO: 'QQ:85-15,JJ:45-55,TT:30-70,AKs:90-10,AQs:50-50,AJs:20-80,A5s:70-30,A4s:65-35,A3s:35-65,A2s:30-70,KQs:35-65,KJs:20-80,QJs:15-85,JTs:10-90,99:15-85,88:10-90',
+    BTN: 'QQ:85-15,JJ:50-50,TT:30-70,99:20-80,88:15-85,AKs:90-10,AQs:50-50,AJs:20-80,ATs:10-90,A5s:75-25,A4s:70-30,A3s:40-60,A2s:35-65,KQs:40-60,KJs:25-75,QJs:20-80,QTs:15-85,JTs:15-85,J9s:10-90',
+  },
+  BB: {
+    UTG: 'QQ:55-45,JJ:20-80,TT:10-90,99:5-95,88:5-95,AKs:75-25,AQs:25-75,AJs:15-85,ATs:10-90,A5s:50-50,A4s:45-55,A3s:15-85,A2s:10-90,KQs:15-85,AQo:15-80,AJo:0-85,ATo:0-90,KQo:10-80',
+    MP: 'QQ:55-45,JJ:20-80,TT:10-90,99:5-95,88:5-95,AKs:80-20,AQs:30-70,AJs:15-85,ATs:10-90,A5s:55-45,A4s:50-50,A3s:20-80,A2s:15-85,KQs:20-80,AQo:15-80,AJo:0-85,ATo:0-90,KQo:15-80,KJo:0-90',
+    CO: 'QQ:60-40,JJ:25-75,TT:15-85,99:10-90,88:5-95,AKs:85-15,AQs:35-65,AJs:20-80,ATs:10-90,A5s:60-40,A4s:55-45,A3s:25-75,A2s:20-80,KQs:25-75,KJs:10-90,AQo:20-75,AJo:0-85,ATo:0-90,KJo:0-90,KQo:20-75',
+    BTN: 'QQ:65-35,JJ:30-70,TT:20-80,99:15-85,88:10-90,AKs:90-10,AQs:40-60,AJs:25-75,ATs:15-85,A5s:65-35,A4s:60-40,A3s:30-70,A2s:25-75,KQs:30-70,KJs:20-80,QTs:10-90,AQo:25-70,AJo:0-80,ATo:0-85,KJo:15-75,QJo:0-85,KQo:25-70,A8o:0-90',
+    SB: 'QQ:65-35,JJ:35-65,TT:25-75,99:20-80,88:15-85,AKs:90-10,AQs:40-60,AJs:25-75,ATs:15-85,A5s:70-30,A4s:65-35,A3s:35-65,A2s:30-70,KQs:35-65,KJs:25-75,QJs:20-80,JTs:15-85,AQo:30-65,AJo:0-80,ATo:0-85,KJo:15-75,QJo:0-85,KQo:25-70,JTo:0-85',
+  },
+}
+
+const mixCache = new Map<string, Map<string, { tb: number; call: number }>>()
+
+function parseMixSpec(defender: Position, raiser: Position): Map<string, { tb: number; call: number }> | null {
+  const spec = MIX_SPECS[defender]?.[raiser]
+  if (!spec) return null
+  const key = `${defender}|${raiser}`
+  const hit = mixCache.get(key)
+  if (hit) return hit
+  const out = new Map<string, { tb: number; call: number }>()
+  for (const raw of spec.split(',')) {
+    const m = /^([AKQJT98765432]{2}[so]?):(\d{1,3})-(\d{1,3})$/.exec(raw.trim())
+    if (!m) continue
+    const tb = Number(m[2])
+    const call = Number(m[3])
+    if (tb + call <= 100) out.set(m[1], { tb, call })
+  }
+  mixCache.set(key, out)
+  return out
+}
+
+const freqCache = new Map<string, Map<string, ActionFreq>>()
+
+/**
+ * Частоты действий (3бет/колл/фолд) по всем рукам чарта защиты против рейза.
+ * Основа — бинарные сеты vsRaiseCharts; поверх накладывается таблица смешанных
+ * частот MIX_SPECS. Руки, попавшие в оба сета без явной записи, считаются
+ * миксом «3бет 65% / колл 35%» (блокер-3беты играются агрессивнее).
+ */
+export function holdemActionFrequencies(defender: Position, raiser: Position, players = 6, callerFactor = 1): Map<string, ActionFreq> | null {
+  const chart = vsRaiseCharts(defender, raiser, players, callerFactor)
+  if (!chart) return null
+  const key = `${defender}|${raiser}|${players}|${callerFactor.toFixed(2)}`
+  const hit = freqCache.get(key)
+  if (hit) return hit
+  const mix = parseMixSpec(defender, raiser)
+  const m = Math.max(0.45, Math.min(1, callerFactor)) // мультпот сужает смешанные частоты
+  const out = new Map<string, ActionFreq>()
+  const all = new Set([...chart.threeBet, ...chart.call])
+  for (const cls of all) {
+    const mx = mix?.get(cls)
+    let f: ActionFreq
+    if (mx) {
+      const raise = Math.round(mx.tb * m)
+      const call = Math.round(mx.call * m)
+      f = { raise, call, fold: 100 - raise - call }
+    } else if (chart.threeBet.has(cls) && chart.call.has(cls)) {
+      f = { raise: 65, call: 35, fold: 0 }
+    } else if (chart.threeBet.has(cls)) {
+      f = { raise: 100, call: 0, fold: 0 }
+    } else {
+      f = { raise: 0, call: 100, fold: 0 }
+    }
+    out.set(cls, f)
+  }
+  freqCache.set(key, out)
+  return out
+}
+
+/** Действие с наибольшей частотой. */
+export function dominantAction(f: ActionFreq): 'raise' | 'call' | 'fold' {
+  if (f.raise >= f.call && f.raise >= f.fold) return 'raise'
+  if (f.call >= f.fold) return 'call'
+  return 'fold'
+}
+
+/** Второе действие смешанной стратегии с частотой ≥ minPct (или null). */
+export function secondaryAction(f: ActionFreq, minPct = 25): { action: 'raise' | 'call' | 'fold'; freq: number } | null {
+  const dom = dominantAction(f)
+  const cands: Array<['raise' | 'call' | 'fold', number]> = [
+    ['raise', f.raise], ['call', f.call], ['fold', f.fold],
+  ]
+  const alt = cands
+    .filter(([a, v]) => a !== dom && v >= minPct)
+    .sort((x, y) => y[1] - x[1])
+  return alt.length ? { action: alt[0][0], freq: alt[0][1] } : null
+}
+
+/** Рука считается смешанной, если ни одно действие не достигает 95%. */
+export function isMixed(f: ActionFreq): boolean {
+  return Math.max(f.raise, f.call, f.fold) < 95
+}
+
+/** Агрегат по всему диапазону: средневзвешенные по комбинациям доли действий, %. */
+export function freqAggregate(freq: Map<string, ActionFreq>): ActionFreq {
+  let raise = 0
+  let call = 0
+  for (const [cls, f] of freq) {
+    const w = classCombos(cls)
+    raise += (f.raise * w) / 100
+    call += (f.call * w) / 100
+  }
+  const r = (raise / 1326) * 100
+  const c = (call / 1326) * 100
+  const fd = 100 - r - c
+  const round1 = (x: number) => Math.round(x * 10) / 10
+  return { raise: round1(r), call: round1(c), fold: round1(fd) }
+}
+
+/** Наиболее смешанные руки диапазона — для примеров в UI. */
+export function mixExamples(freq: Map<string, ActionFreq>, n = 3): Array<{ cls: string; f: ActionFreq }> {
+  return [...freq.entries()]
+    .filter(([, f]) => isMixed(f))
+    .sort((a, b) => Math.max(...Object.values(a[1])) - Math.max(...Object.values(b[1])) || b[1].raise - a[1].raise)
+    .slice(0, n)
+    .map(([cls, f]) => ({ cls, f }))
+}
+
+/** Компактная запись частот для ячейки сетки: '55·45' (рейз·колл·фолд). */
+export function freqShort(f: ActionFreq): string {
+  return [f.raise, f.call, f.fold].filter((v) => v > 0).join('·')
+}
+
+/** Читаемая запись частот: '3бет 55% / колл 45%' (raiseLabel — название рейза: «3бет» или «рейз»). */
+export function freqLabel(f: ActionFreq, raiseLabel = '3бет'): string {
+  const parts: string[] = []
+  if (f.raise > 0) parts.push(`${raiseLabel} ${f.raise}%`)
+  if (f.call > 0) parts.push(`колл ${f.call}%`)
+  if (f.fold > 0) parts.push(`фолд ${f.fold}%`)
+  return parts.join(' / ')
+}
+
 // ---------- Отдельные чарты открытия под каждый размер стола ----------
 
 /**

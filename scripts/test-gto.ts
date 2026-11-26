@@ -3,10 +3,11 @@
 import { parseCard, Card } from '../src/lib/poker/cards'
 import {
   seatsForTable, basePos, holdemPreflop, holdemAction,
-  omahaPreflop, omahaAction, postflopPlan, preflopNotes, multiwayNote,
+  omahaPreflop, omahaAction, omahaActionFreqs, postflopPlan, preflopNotes, multiwayNote,
   analyzeBoardTexture,
 } from '../src/lib/poker/gto'
-import { openPercentFor, vsRaiseCharts, validRaisersFor } from '../src/lib/poker/ranges'
+import { openPercentFor, vsRaiseCharts, validRaisersFor, holdemActionFrequencies, freqAggregate, dominantAction, secondaryAction, mixExamples, isMixed } from '../src/lib/poker/ranges'
+import { isSimActionCorrect } from '../src/lib/poker/training'
 
 let failures = 0
 function assert(cond: boolean, msg: string) {
@@ -104,6 +105,67 @@ const sizeOf = (note: string) => Number(/(\d+)%/.exec(note)?.[1] ?? 0)
   assert(holdemAction('AJs', vsUTG) === 'call', 'AJs против UTG — колл')
   assert(holdemAction('AQs', vsBTN) === 'raise', 'AQs против BTN — 3бет')
   assert(holdemAction('AQs', vsUTG) === 'call', 'AQs против UTG — колл')
+}
+
+// 4b. Частотные смеси (как в GTO-солвере)
+{
+  const bbUtg = holdemActionFrequencies('BB', 'UTG', 6)
+  const qq = bbUtg?.get('QQ')
+  assert(!!qq && qq.raise === 55 && qq.call === 45 && qq.fold === 0, `QQ против UTG (BB): микс 55/45 (${qq?.raise}/${qq?.call}/${qq?.fold})`)
+  const ats = bbUtg?.get('ATs')
+  assert(!!ats && ats.call >= 80 && ats.raise > 0 && ats.raise < 50, `ATs против UTG (BB): колл-доминантный микс (${ats?.raise}/${ats?.call})`)
+  const ajo = bbUtg?.get('AJo')
+  assert(!!ajo && ajo.call > 0 && ajo.fold > 0 && ajo.raise === 0, `AJo против UTG (BB): микс колл/фолд (${ajo?.call}/${ajo?.fold})`)
+  // суммы частот = 100 во всех допустимых парах защитник × рейзер и размерах стола
+  let badSum = 0
+  let mixedFound = 0
+  for (const def of ['UTG', 'MP', 'CO', 'BTN', 'SB', 'BB'] as const) {
+    for (const r of validRaisersFor(def)) {
+      for (const n of [2, 6, 9]) {
+        const m = holdemActionFrequencies(def, r, n)
+        if (!m) continue
+        for (const [, f] of m) {
+          if (f.raise + f.call + f.fold !== 100) badSum++
+          if (isMixed(f)) mixedFound++
+        }
+      }
+    }
+  }
+  assert(badSum === 0, 'суммы частот = 100 во всех парах и размерах стола')
+  assert(mixedFound > 100, `смешанные руки реально присутствуют в чартах (${mixedFound} миксов)`)
+  // агрегат: соотношение 3бет/колл/фолд по диапазону
+  const agg = freqAggregate(holdemActionFrequencies('BB', 'BTN', 6)!)
+  assert(Math.abs(agg.raise + agg.call + agg.fold - 100) < 0.2, `агрегат BB vs BTN: сумма ~100 (${agg.raise}/${agg.call}/${agg.fold})`)
+  assert(agg.raise >= 3 && agg.call > 15 && agg.fold > 55, 'агрегат BB vs BTN: реалистичные доли (3бет ≥3%, колл >15%, фолд >55%)')
+  assert(agg.call > freqAggregate(holdemActionFrequencies('BB', 'UTG', 6)!).call, 'агрегат: колл против BTN шире, чем против UTG')
+  // микс-примеры: только действительно смешанные руки
+  const ex = mixExamples(holdemActionFrequencies('BB', 'UTG', 6)!, 3)
+  assert(ex.length >= 2 && ex.every((e) => isMixed(e.f)), `микс-примеры: только смешанные руки (${ex.map((e) => e.cls).join(', ')})`)
+  // доминантное и альтернативное действие
+  assert(dominantAction({ raise: 55, call: 45, fold: 0 }) === 'raise', 'доминанта 55/45 → рейз')
+  assert(dominantAction({ raise: 20, call: 80, fold: 0 }) === 'call', 'доминанта 20/80 → колл')
+  const sec = secondaryAction({ raise: 55, call: 45, fold: 0 }, 25)
+  assert(sec?.action === 'call' && sec.freq === 45, 'альтернатива 55/45 → колл 45%')
+  assert(secondaryAction({ raise: 100, call: 0, fold: 0 }, 25) === null, 'чистый рейз — без альтернативы')
+  const sec2 = secondaryAction({ raise: 40, call: 30, fold: 30 }, 25)
+  assert(sec2?.action === 'call' && sec2.freq === 30, 'тройной микс: альтернатива — колл 30%')
+  // засчитывание микс-альтернативы в симуляторе
+  assert(isSimActionCorrect({ correctAction: 'raise', altAction: 'call' }, 'call'), 'микс-альтернатива засчитывается')
+  assert(!isSimActionCorrect({ correctAction: 'raise', altAction: 'call' }, 'fold'), 'не-альтернатива не засчитывается')
+  assert(!isSimActionCorrect({ correctAction: 'raise' }, 'call'), 'без альтернативы — только основное действие')
+
+  // Омаха: плавные смеси у границ
+  const oChart = omahaPreflop('omaha4', 'BB', 6, 'vsraise', 0, 'UTG')
+  const strong = omahaActionFreqs('omaha4', hand(['Ah', 'Ad', 'Kh', 'Qd']), oChart, 'vsraise')
+  assert(strong.raise === 100 && strong.call === 0, `AAKQ ds: чистый 3бет (${strong.raise}/${strong.call}/${strong.fold})`)
+  const mid = omahaActionFreqs('omaha4', hand(['Kh', 'Qh', 'Jd', '9d']), oChart, 'vsraise')
+  assert(mid.raise + mid.call + mid.fold === 100 && mid.fold === 0, `KQJ9 ds: сумма 100, без фолда (${mid.raise}/${mid.call}/${mid.fold})`)
+  const trash = omahaActionFreqs('omaha4', hand(['9h', '8d', '6c', '4s']), oChart, 'vsraise')
+  assert(trash.fold >= 50, `слабая рука: фолд-доминанта (${trash.fold}% фолд)`)
+  // монотонность: чем сильнее рука, тем выше частота рейза
+  const eq1 = omahaActionFreqs('omaha4', hand(['Ah', 'Ad', 'Kh', 'Qd']), oChart, 'vsraise').raise
+  const eq2 = omahaActionFreqs('omaha4', hand(['Kh', 'Qh', 'Jd', '9d']), oChart, 'vsraise').raise
+  assert(eq1 >= eq2, 'сильнейшая рука — не меньшая частота рейза')
 }
 
 // 5. Омаха: размеры стола и позиционность защиты

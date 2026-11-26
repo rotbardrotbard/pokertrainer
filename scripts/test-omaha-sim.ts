@@ -5,7 +5,8 @@ import { bestOmahaHand } from '../src/lib/poker/omaha'
 import {
   bestOmahaScoreFast, simulateOmahaDouble, analyzePloHand, genOmahaSimScenario, genOmahaSimExam,
 } from '../src/lib/poker/omahaSim'
-import { omahaPreflop, omahaAction, omahaEquityTier } from '../src/lib/poker/gto'
+import { omahaPreflop, omahaAction, omahaActionFreqs, omahaEquityTier } from '../src/lib/poker/gto'
+import { dominantAction, isMixed } from '../src/lib/poker/ranges'
 import { omahaHandPercentile, handInRange } from '../src/lib/poker/handRanges'
 
 let failures = 0
@@ -209,9 +210,14 @@ function hasDuplicates(cards: Card[]): boolean {
         assert(s.handPct! >= 1 && s.handPct! <= 100, `percentile range #${t}`)
         const game = hc === 4 ? 'omaha4' : 'omaha5'
         const situation = s.kind === 'open' ? 'open' : 'vsraise'
-        // правильное действие согласовано с GTO-чартом позиции
-        const expected = omahaAction(game, s.hero, s.chart!, situation)
+        // правильное действие согласовано с GTO-чартом позиции: генератор берёт доминанту смешанных частот
+        const sfreqs = omahaActionFreqs(game, s.hero, s.chart!, situation)
+        const expected = dominantAction(sfreqs)
         assert(s.correctAction === expected, `preflop action match ${s.kind} #${t}`)
+        // бинарное действие чарта обязано совпадать с доминантой для чистых (не смешанных) рук;
+        // у смешанных рук у границы диапазона допускается расхождение (зона плавного смешения)
+        const binary = omahaAction(game, s.hero, s.chart!, situation)
+        if (!isMixed(sfreqs)) assert(s.correctAction === binary, `binary match outside mix band ${s.kind} #${t}`)
         // чарт соответствует параметрам позиции/стола/ситуации
         const ref = omahaPreflop(game, s.position, s.players, situation, 0, s.raiser)
         if (s.kind === 'open') {

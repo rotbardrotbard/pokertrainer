@@ -21,6 +21,7 @@ import {
   genOmahaSimScenario,
   genOmahaSimExam,
   ExamLength,
+  isOmahaSimActionCorrect,
 } from '@/lib/poker/omahaSim'
 import { POSITION_NAMES_RU } from '@/lib/poker/ranges'
 import type { GameKind } from '@/lib/poker/handRanges'
@@ -211,8 +212,8 @@ export function OmahaSimView({ variant, onBack, onOpenGto }: { variant: DoubleVa
   function answer(a: OmahaSimAction) {
     if (!scenario || answered) return
     setAnswered(a)
-    // раздача, решённая по подсказке, не идёт в статистику
-    if (!hintShown) record(trainerId, a === scenario.correctAction)
+    // раздача, решённая по подсказке, не идёт в статистику; микс-альтернатива (≥25%) засчитывается
+    if (!hintShown) record(trainerId, isOmahaSimActionCorrect(scenario, a))
   }
 
   function showHint() {
@@ -241,15 +242,15 @@ export function OmahaSimView({ variant, onBack, onOpenGto }: { variant: DoubleVa
     const na = examAnswers.slice()
     na[examIndex] = a
     setExamAnswers(na)
-    // в экзамене подсказок нет — каждый ответ идёт в статистику
-    record(trainerId, a === sc.correctAction)
+    // в экзамене подсказок нет — каждый ответ идёт в статистику (микс-альтернатива тоже)
+    record(trainerId, isOmahaSimActionCorrect(sc, a))
   }
 
   function examNext() {
     if (examIndex + 1 >= examQueue.length) {
       let correctN = 0
       examQueue.forEach((sc, i) => {
-        if (examAnswers[i] === sc.correctAction) correctN++
+        if (isOmahaSimActionCorrect(sc, examAnswers[i])) correctN++
       })
       recordExam(trainerId, correctN, examQueue.length)
       setExamState('results')
@@ -418,7 +419,7 @@ export function OmahaSimView({ variant, onBack, onOpenGto }: { variant: DoubleVa
     const total = examQueue.length
     let correctN = 0
     examQueue.forEach((sc, i) => {
-      if (examAnswers[i] === sc.correctAction) correctN++
+      if (isOmahaSimActionCorrect(sc, examAnswers[i])) correctN++
     })
     const pct = total > 0 ? Math.round((correctN / total) * 100) : 0
     const grade = examGrade(pct)
@@ -476,7 +477,7 @@ export function OmahaSimView({ variant, onBack, onOpenGto }: { variant: DoubleVa
             <div className="flex flex-col gap-2">
               {examQueue.map((sc, i) => {
                 const given = examAnswers[i] ?? null
-                const ok = given === sc.correctAction
+                const ok = isOmahaSimActionCorrect(sc, given)
                 return (
                   <div
                     key={i}
@@ -582,7 +583,7 @@ export function OmahaSimView({ variant, onBack, onOpenGto }: { variant: DoubleVa
 
   // --- тренировка: вопрос и разбор ---
 
-  const correct = answered !== null && answered === scenario.correctAction
+  const correct = isOmahaSimActionCorrect(scenario, answered)
   const isPostflop = scenario.kind === 'postflop'
 
   // панель эквити: до ответа (по подсказке) и после ответа

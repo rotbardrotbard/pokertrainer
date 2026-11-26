@@ -16,6 +16,7 @@ import {
 } from '@/lib/poker/gto'
 import type { Street, TierPlan } from '@/lib/poker/gto'
 import type { Position } from '@/lib/poker/ranges'
+import { freqAggregate, freqLabel, mixExamples } from '@/lib/poker/ranges'
 import { parseCard } from '@/lib/poker/cards'
 import type { Card as PokerCard } from '@/lib/poker/cards'
 import { cn } from '@/lib/utils'
@@ -337,9 +338,11 @@ export function GtoView({ onBack, initial }: { onBack: () => void; initial?: Gto
 
       <p className="text-xs text-stone-500 leading-relaxed">
         Чарты упрощены для обучения: для каждого размера стола 2–9-max задан свой диапазон открытия; ширина
-        защиты против рейза зависит от позиции рейзера. Постфлоп-план учитывает текстуру доски, размер ставки
-        оппонента и смешанные частоты, но в реальной GTO-стратегии значения ещё зависят от стеков, тендеров и
-        типов оппонентов. Диапазоны Омахи оцениваются по структуре руки (тузы, мастевость, связки, пары).
+        защиты против рейза зависит от позиции рейзера. Пограничные руки играются смешанными частотами
+        (как в GTO-солвере): доли 3бет/колл/фолд показаны в ячейках сетки, итоговое соотношение действий — в
+        сводке сверху. Постфлоп-план учитывает текстуру доски, размер ставки оппонента и смешанные частоты;
+        в реальной GTO значения ещё зависят от стеков, тендеров и типов оппонентов. Диапазоны Омахи
+        оцениваются по структуре руки (тузы, мастевость, связки, пары).
       </p>
     </TrainerShell>
   )
@@ -431,27 +434,48 @@ function PreflopHoldem({
   opponents: number
   notes: string[]
 }) {
+  const agg = situation === 'vsraise' && chart.freq.size > 0
+    ? freqAggregate(chart.freq)
+    : null
+  const mixes = situation === 'vsraise' && chart.freq.size > 0 ? mixExamples(chart.freq, 3) : []
   return (
     <Card className="border-stone-800 bg-stone-900/60">
       <CardContent className="p-4 sm:p-6 flex flex-col gap-4">
         <SummaryLine
-          items={situation === 'open'
+          items={agg
             ? [
-                { text: `Рейз: топ ${chart.raisePct.toFixed(0)}% рук`, action: 'raise' },
-                { text: 'Фолд: остальное', action: 'fold' },
+                { text: `3бет: ${agg.raise.toFixed(0)}%`, action: 'raise' },
+                { text: `Колл: ${agg.call.toFixed(0)}%`, action: 'call' },
+                { text: `Фолд: ${agg.fold.toFixed(0)}%`, action: 'fold' },
               ]
             : [
-                { text: `3бет: топ ${chart.raisePct.toFixed(0)}%`, action: 'raise' },
-                { text: `Колл: топ ${chart.callPct.toFixed(0)}%`, action: 'call' },
+                { text: `Рейз: топ ${chart.raisePct.toFixed(0)}% рук`, action: 'raise' },
                 { text: 'Фолд: остальное', action: 'fold' },
               ]}
         />
-        <RangeGrid getAction={(cls) => holdemAction(cls, chart)} />
+        {agg && (
+          <p className="text-xs text-stone-500">
+            Соотношение действий по всем комбинациям (частоты GTO). Без миксов: 3бет — топ {chart.raisePct.toFixed(0)}%, колл — топ {chart.callPct.toFixed(0)}%.
+          </p>
+        )}
+        {mixes.length > 0 && (
+          <div className="rounded-lg border border-stone-800 bg-neutral-900/50 p-3 flex flex-col gap-1.5">
+            <p className="text-xs text-amber-200">Смешанные частоты (пограничные руки играются обоими действиями)</p>
+            <div className="flex flex-wrap gap-1.5">
+              {mixes.map((e) => (
+                <span key={e.cls} className="px-2 py-0.5 rounded text-[11px] font-normal bg-stone-800 text-stone-200">
+                  {e.cls}: {freqLabel(e.f)}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+        <RangeGrid getAction={(cls) => holdemAction(cls, chart)} getFreq={(cls) => chart.freq.get(cls)} />
         <LegendHoldem situation={situation} />
         <p className="text-xs text-stone-400">
           {situation === 'open'
             ? `Открытие с ${pos} за столом ${players}-max${opponents > 0 ? ` против ${opponents} лимпов: рейз чуть тайтовее` : ''} — отдельный чарт под этот размер стола.`
-            : `Защита ${pos} против открытия с ${raiser} за столом ${players}-max${opponents > 1 ? ` и ${opponents - 1} колл${opponents - 1 === 1 ? 'ом' : 'ами'}` : ''}.`}
+            : `Защита ${pos} против открытия с ${raiser} за столом ${players}-max${opponents > 1 ? ` и ${opponents - 1} колл${opponents - 1 === 1 ? 'ом' : 'ами'}` : ''}. В ячейке микса цифры — доли действий: 3бет·колл·фолд.`}
         </p>
         <NotesList notes={notes} />
       </CardContent>
@@ -503,11 +527,16 @@ function PreflopOmaha({
                 { text: 'Фолд: слабее', action: 'fold' },
               ]
             : [
-                { text: `3бет: топ ${chart.threeBetPercent.toFixed(0)}% (≥ ${chart.threeBetThreshold.toFixed(0)})`, action: 'raise' },
-                { text: `Колл: топ ${chart.callPercent.toFixed(0)}% (≥ ${chart.callThreshold.toFixed(0)})`, action: 'call' },
-                { text: 'Фолд: слабее', action: 'fold' },
+                { text: `3бет ≈ ${chart.threeBetPercent.toFixed(0)}% (оценка ≥ ${chart.threeBetThreshold.toFixed(0)})`, action: 'raise' },
+                { text: `Колл ≈ ${(chart.callPercent - chart.threeBetPercent).toFixed(0)}%`, action: 'call' },
+                { text: `Фолд ≈ ${(100 - chart.callPercent).toFixed(0)}%`, action: 'fold' },
               ]}
         />
+        {situation === 'vsraise' && (
+          <p className="text-xs text-stone-500">
+            У границ 3бет/колл и колл/фолд частоты плавно смешаны (зона ±3% диапазона): пограничные руки играются обоими действиями.
+          </p>
+        )}
 
         {openHands && openHands.length > 0 && (
           <div className="flex flex-col gap-1.5">

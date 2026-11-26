@@ -1,8 +1,10 @@
 'use client'
 
-// Сетка 13×13 для просмотра диапазонов префлоп
+// Сетка 13×13 для просмотра диапазонов префлоп (с поддержкой смешанных частот GTO)
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
+import type { ActionFreq } from '@/lib/poker/ranges'
+import { isMixed, freqShort, freqLabel } from '@/lib/poker/ranges'
 
 export const RANKS = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2']
 
@@ -22,12 +24,16 @@ const actionStyles: Record<RangeCellAction, string> = {
 
 export function RangeGrid({
   getAction,
+  getFreq,
   cellSize = 'text-[10px]',
 }: {
   getAction: (cls: string) => RangeCellAction
+  getFreq?: (cls: string) => ActionFreq | undefined
   cellSize?: string
 }) {
   const [selected, setSelected] = useState<string | null>(null)
+  const selectedFreq = selected && getFreq ? getFreq(selected) : undefined
+  const selectedMixed = selectedFreq ? isMixed(selectedFreq) : false
   return (
     <div className="flex flex-col gap-2">
       <div className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-px bg-stone-950/40 rounded-lg overflow-hidden border border-stone-950/40">
@@ -35,6 +41,8 @@ export function RangeGrid({
           RANKS.map((__, col) => {
             const cls = classFor(row, col)
             const action = getAction(cls)
+            const freq = getFreq?.(cls)
+            const mixed = freq ? isMixed(freq) : false
             return (
               <button
                 key={`${row}-${col}`}
@@ -42,14 +50,17 @@ export function RangeGrid({
                 onClick={() => setSelected(cls)}
                 className={cn(
                   cellSize,
-                  'aspect-square flex items-center justify-center font-normal leading-none min-w-0 hover:brightness-110 transition cursor-pointer',
+                  'aspect-square flex flex-col items-center justify-center font-normal leading-none min-w-0 hover:brightness-110 transition cursor-pointer relative overflow-hidden',
                   actionStyles[action],
                   selected === cls && 'ring-2 ring-white z-10',
                 )}
-                title={`${cls}: ${actionLabel(action)}`}
-                aria-label={`${cls}: ${actionLabel(action)}`}
+                title={mixed && freq ? `${cls}: ${freqLabel(freq)}` : `${cls}: ${actionLabel(action)}`}
+                aria-label={mixed && freq ? `${cls}: ${freqLabel(freq)}` : `${cls}: ${actionLabel(action)}`}
               >
-                {cls}
+                <span className={mixed ? 'mt-0.5' : ''}>{cls}</span>
+                {mixed && freq && (
+                  <span className="text-[8px] opacity-80 leading-none">{freqShort(freq)}</span>
+                )}
               </button>
             )
           }),
@@ -57,11 +68,17 @@ export function RangeGrid({
       </div>
       <div className="text-xs text-stone-400 min-h-4">
         {selected ? (
-          <span>
-            <span className="font-normal text-stone-100">{selected}</span> — {actionLabel(getAction(selected))}
-          </span>
+          selectedMixed && selectedFreq ? (
+            <span>
+              <span className="font-normal text-stone-100">{selected}</span> — {freqLabel(selectedFreq)}
+            </span>
+          ) : (
+            <span>
+              <span className="font-normal text-stone-100">{selected}</span> — {actionLabel(getAction(selected))}
+            </span>
+          )
         ) : (
-          <span>Нажмите на руку, чтобы увидеть действие</span>
+          <span>Нажмите на руку, чтобы увидеть действие и частоты</span>
         )}
       </div>
     </div>

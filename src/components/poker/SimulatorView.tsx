@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { PlayingCard, CardRow } from './PlayingCard'
 import { TrainerShell, Feedback, ScenarioCard } from './TrainerShell'
 import { useStats } from '@/store/stats'
-import { SimScenarioBase, SimAction, genSimScenario } from '@/lib/poker/training'
+import { SimScenarioBase, SimAction, genSimScenario, isSimActionCorrect } from '@/lib/poker/training'
 import { POSITION_NAMES_RU } from '@/lib/poker/ranges'
 
 export function SimulatorView({ onBack }: { onBack: () => void }) {
@@ -24,7 +24,8 @@ export function SimulatorView({ onBack }: { onBack: () => void }) {
   function answer(a: SimAction) {
     if (!scenario || answered) return
     setAnswered(a)
-    record('sim', a === scenario.correctAction)
+    // микс-альтернатива с частотой ≥ 25% тоже засчитывается
+    record('sim', isSimActionCorrect(scenario, a))
   }
 
   // стартовый сценарий создаётся при первом рендере
@@ -44,7 +45,7 @@ export function SimulatorView({ onBack }: { onBack: () => void }) {
     )
   }
 
-  const correct = answered !== null && answered === scenario.correctAction
+  const correct = isSimActionCorrect(scenario, answered)
   const boardShown = scenario.kind === 'postflop' ? scenario.board ?? [] : null
 
   return (

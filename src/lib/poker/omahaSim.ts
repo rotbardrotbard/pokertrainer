@@ -6,8 +6,8 @@
 import { Card, fullDeck, RANK_CHARS } from './cards'
 import { handName } from './evaluator'
 import { bestOmahaHand } from './omaha'
-import { Position, POSITION_NAMES_RU } from './ranges'
-import { seatsForTable, basePos, omahaPreflop, omahaAction, omahaEquityTier } from './gto'
+import { Position, POSITION_NAMES_RU, dominantAction, secondaryAction, freqLabel } from './ranges'
+import { seatsForTable, basePos, omahaPreflop, omahaActionFreqs, omahaEquityTier } from './gto'
 import type { OmahaPreflop } from './gto'
 import { omahaHandPercentile } from './handRanges'
 
@@ -305,6 +305,15 @@ export function analyzePloHand(cards: Card[]): PloProfile {
 export type OmahaSimAction = 'fold' | 'call' | 'raise'
 export type OmahaSimKind = 'open' | 'vsRaise' | 'postflop'
 
+/** Засчитывается ли ответ: основное действие или допустимый микс-альтернатива. */
+export function isOmahaSimActionCorrect(
+  sc: { correctAction: OmahaSimAction; altAction?: OmahaSimAction },
+  a: OmahaSimAction | null,
+): boolean {
+  if (a === null) return false
+  return a === sc.correctAction || (sc.altAction !== undefined && a === sc.altAction)
+}
+
 export interface OmahaSimScenario {
   holeCount: 4 | 5
   kind: OmahaSimKind
@@ -320,6 +329,8 @@ export interface OmahaSimScenario {
   prompt: string
   actionLabels: { fold: string; call: string | null; raise: string }
   correctAction: OmahaSimAction
+  altAction?: OmahaSimAction // второе действие смешанной стратегии (тоже засчитывается)
+  altFreq?: number // частота второго действия, %
   pot: number
   bet: number
   stack: number
@@ -334,6 +345,8 @@ export interface OmahaSimScenario {
 
 const ri = (n: number) => Math.floor(Math.random() * n)
 const pick = <T,>(arr: readonly T[]): T => arr[ri(arr.length)]
+
+const OMAHA_SIM_ALT: Record<OmahaSimAction, string> = { fold: 'фолд', call: 'колл', raise: '3бет' }
 
 // размеры стола в симуляторе: от хедз-апа до 9-max
 const SIM_TABLES = [2, 3, 4, 5, 6, 9] as const
@@ -372,9 +385,17 @@ function genOpenScenario(holeCount: 4 | 5): OmahaSimScenario {
   const hero = deck.slice(0, holeCount)
   const profile = analyzePloHand(hero)
   const chart = omahaPreflop(game, pos, players, 'open', 0)
-  const correct: OmahaSimAction = omahaAction(game, hero, chart, 'open')
+  // смешанные частоты у границы диапазона: пограничная рука — микс рейз/фолд
+  const freqs = omahaActionFreqs(game, hero, chart, 'open')
+  const correct: OmahaSimAction = dominantAction(freqs)
+  const sec = secondaryAction(freqs, 25)
+  const altAction = sec?.action
+  const altFreq = sec?.freq
   const handPct = omahaHandPercentile(game, hero)
   const raisePct = Math.round(chart.openPercent)
+  const mixNote = altAction
+    ? ` Пограничная рука: смешанная стратегия — допустимо и «${OMAHA_SIM_ALT[altAction]}» (~${altFreq}%).`
+    : ''
   return {
     holeCount,
     kind: 'open',
@@ -389,6 +410,8 @@ function genOpenScenario(holeCount: 4 | 5): OmahaSimScenario {
     prompt: `${POSITION_NAMES_RU[pos]} · стол ${players}-max. До вас все сбросили. Ваше действие?`,
     actionLabels: { fold: 'Фолд', call: null, raise: 'Рейз до 3bb' },
     correctAction: correct,
+    altAction,
+    altFreq,
     pot: 1.5,
     bet: 0,
     stack: 100,
@@ -398,12 +421,13 @@ function genOpenScenario(holeCount: 4 | 5): OmahaSimScenario {
     heroHands: null,
     heroBest: null,
     explanation: correct === 'raise'
-      ? `Рука — топ ~${handPct}% стартовых (${profile.desc.toLowerCase()}) — входит в диапазон открытия с ${POSITION_NAMES_RU[pos]} (топ ~${raisePct}%). Открывайте рейзом 3–4bb.`
-      : `Рука — топ ~${handPct}% стартовых (${profile.desc.toLowerCase()}) — вне диапазона открытия с ${POSITION_NAMES_RU[pos]} (топ ~${raisePct}%). Сбрасывайте.`,
+      ? `Рука — топ ~${handPct}% стартовых (${profile.desc.toLowerCase()}) — входит в диапазон открытия с ${POSITION_NAMES_RU[pos]} (топ ~${raisePct}%). Открывайте рейзом 3–4bb.${mixNote}`
+      : `Рука — топ ~${handPct}% стартовых (${profile.desc.toLowerCase()}) — вне диапазона открытия с ${POSITION_NAMES_RU[pos]} (топ ~${raisePct}%). Сбрасывайте.${mixNote}`,
     detail: [
       ...profile.features,
       `GTO-чарт: открытие с ${POSITION_NAMES_RU[pos]} за столом ${players}-max — рейз с топ ~${raisePct}% рук (оценка структуры ≥ ${Math.round(chart.openThreshold)} из 100).`,
       `Ваша рука по той же шкале — топ ~${handPct}%: чем раньше позиция и больше стол, тем тайтовее диапазон.`,
+      `Частоты GTO: ${freqLabel(freqs, 'рейз')}.`,
     ],
   }
 }
@@ -423,10 +447,18 @@ function genVsRaiseScenario(holeCount: 4 | 5): OmahaSimScenario {
   const openSize = 3
   // все сбросили до героя: только рейзер в банке (opponents = 1, callers = 0)
   const chart = omahaPreflop(game, pos, players, 'vsraise', 0, villainPos)
-  const correct: OmahaSimAction = omahaAction(game, hero, chart, 'vsraise')
+  // смешанные частоты: у границы 3бета — микс 3бет/колл, у границы колла — микс колл/фолд
+  const freqs = omahaActionFreqs(game, hero, chart, 'vsraise')
+  const correct: OmahaSimAction = dominantAction(freqs)
+  const sec = secondaryAction(freqs, 25)
+  const altAction = sec?.action
+  const altFreq = sec?.freq
   const handPct = omahaHandPercentile(game, hero)
   const tbPct = Math.round(chart.threeBetPercent)
   const callPct = Math.round(chart.callPercent)
+  const mixNote = altAction
+    ? ` Смешанная стратегия: допустимо и «${OMAHA_SIM_ALT[altAction]}» (~${altFreq}%).`
+    : ''
   return {
     holeCount,
     kind: 'vsRaise',
@@ -442,6 +474,8 @@ function genVsRaiseScenario(holeCount: 4 | 5): OmahaSimScenario {
     prompt: `${villainPos} открывается рейзом до ${openSize}bb (стол ${players}-max). Вы на ${POSITION_NAMES_RU[pos]}. Ваше действие?`,
     actionLabels: { fold: 'Фолд', call: `Колл ${openSize}bb`, raise: '3бет до 12bb' },
     correctAction: correct,
+    altAction,
+    altFreq,
     pot: 1.5 + openSize,
     bet: openSize,
     stack: 100,
@@ -451,13 +485,14 @@ function genVsRaiseScenario(holeCount: 4 | 5): OmahaSimScenario {
     heroHands: null,
     heroBest: null,
     explanation: correct === 'raise'
-      ? `Рука — топ ~${handPct}% стартовых (${profile.desc.toLowerCase()}) — в 3бет-диапазоне с ${POSITION_NAMES_RU[pos]} (топ ~${tbPct}%). 3бет для вэлью и инициативы.`
+      ? `Рука — топ ~${handPct}% стартовых (${profile.desc.toLowerCase()}) — в 3бет-диапазоне с ${POSITION_NAMES_RU[pos]} (топ ~${tbPct}%). 3бет для вэлью и инициативы.${mixNote}`
       : correct === 'call'
-        ? `Рука — топ ~${handPct}% стартовых: вне 3бета (топ ~${tbPct}%), но в диапазоне колла с ${POSITION_NAMES_RU[pos]} (топ ~${callPct}%). Колл и игра постфлоп.`
-        : `Рука — топ ~${handPct}% стартовых (${profile.desc.toLowerCase()}) — слабее диапазона защиты с ${POSITION_NAMES_RU[pos]} (колл — топ ~${callPct}%). Фолд.`,
+        ? `Рука — топ ~${handPct}% стартовых: вне 3бета (топ ~${tbPct}%), но в диапазоне колла с ${POSITION_NAMES_RU[pos]} (топ ~${callPct}%). Колл и игра постфлоп.${mixNote}`
+        : `Рука — топ ~${handPct}% стартовых (${profile.desc.toLowerCase()}) — слабее диапазона защиты с ${POSITION_NAMES_RU[pos]} (колл — топ ~${callPct}%). Фолд.${mixNote}`,
     detail: [
       ...profile.features,
       `GTO-чарт: против рейза с ${POSITION_NAMES_RU[pos]} — 3бет с топ ~${tbPct}%, колл с топ ~${callPct}% рук (стол ${players}-max).`,
+      `Частоты GTO: ${freqLabel(freqs)}.`,
       'Диапазон зависит от размера стола: чем больше игроков, тем тайтовее защита.',
     ],
   }
