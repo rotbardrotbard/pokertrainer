@@ -313,6 +313,7 @@ export interface OmahaSimScenario {
   boardStreet: number // общая улица постфлопа: длина ОБЕИХ досок (3=флоп, 4=терн, 5=ривер); доски открываются синхронно
   position: Position
   players: number // размер стола (влияет на ширину диапазона)
+  raiser?: Position // позиция рейзера (для сценария vsRaise)
   chart: OmahaPreflop | null // GTO-чарт позиции (префлоп)
   handPct: number | null // место руки: «топ X%» стартовых рук (префлоп)
   gtoHint: string | null // постфлоп: ориентир из GTO-чарта
@@ -421,7 +422,7 @@ function genVsRaiseScenario(holeCount: 4 | 5): OmahaSimScenario {
   const profile = analyzePloHand(hero)
   const openSize = 3
   // все сбросили до героя: только рейзер в банке (opponents = 1, callers = 0)
-  const chart = omahaPreflop(game, pos, players, 'vsraise', 0)
+  const chart = omahaPreflop(game, pos, players, 'vsraise', 0, villainPos)
   const correct: OmahaSimAction = omahaAction(game, hero, chart, 'vsraise')
   const handPct = omahaHandPercentile(game, hero)
   const tbPct = Math.round(chart.threeBetPercent)
@@ -434,6 +435,7 @@ function genVsRaiseScenario(holeCount: 4 | 5): OmahaSimScenario {
     boardStreet: 0,
     position: pos,
     players,
+    raiser: villainPos,
     chart,
     handPct,
     gtoHint: null,

@@ -1,7 +1,7 @@
 'use client'
 
-// GTO-чарты: выбираем стол, позицию, число соперников и раунд —
-// видим, что играть (рейз/колл), а что сбрасывать.
+// GTO-чарты: стол, позиция, рейзер (для защиты), раунд; постфлоп — с текстурой
+// доски, размерами ставок, смешанными частотами и границами против ставок.
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -12,9 +12,11 @@ import type { GameKind } from '@/lib/poker/handRanges'
 import {
   STREET_NAMES_RU, seatsForTable, SEAT_NAMES_RU, basePos,
   holdemPreflop, holdemAction, omahaPreflop,
-  postflopGuide, preflopNotes,
+  postflopPlan, preflopNotes,
 } from '@/lib/poker/gto'
-import type { Street } from '@/lib/poker/gto'
+import type { Street, TierPlan } from '@/lib/poker/gto'
+import type { Position } from '@/lib/poker/ranges'
+import { parseCard } from '@/lib/poker/cards'
 import type { Card as PokerCard } from '@/lib/poker/cards'
 import { cn } from '@/lib/utils'
 
@@ -29,7 +31,25 @@ export interface GtoInitial {
   street?: Street
   situation?: 'open' | 'vsraise'
   opponents?: number
+  raiser?: string // базовая позиция рейзера (для ситуации «против рейза»)
 }
+
+// предустановки текстуры доски (флоп из 3 карт)
+const TEXTURE_PRESETS: Array<{ id: string; label: string; codes: string[] }> = [
+  { id: 'dry', label: 'Сухая радуга', codes: ['9h', '4s', '2d'] },
+  { id: 'wet', label: 'Связанная', codes: ['9s', '8d', '5h'] },
+  { id: 'twotone', label: 'Двухмастная', codes: ['Kd', '9d', '4c'] },
+  { id: 'twotoneStr', label: 'Двухмастная связанная', codes: ['Qs', 'Js', 'Td'] },
+  { id: 'mono', label: 'Моно-масть', codes: ['8h', '5h', '2h'] },
+  { id: 'paired', label: 'Спаренная', codes: ['Ks', 'Kd', '7c'] },
+]
+
+const FACING_OPTIONS: Array<{ pct: number; label: string }> = [
+  { pct: 0, label: 'Нет ставки' },
+  { pct: 33, label: 'Малая 33%' },
+  { pct: 66, label: 'Средняя 66%' },
+  { pct: 100, label: 'Крупная 100%' },
+]
 
 const ACTION_STYLES: Record<'raise' | 'call' | 'fold', string> = {
   raise: 'bg-emerald-500/90 text-stone-950',
@@ -41,6 +61,28 @@ const TIER_DOT: Record<'bet' | 'call' | 'fold', string> = {
   bet: 'bg-emerald-500',
   call: 'bg-sky-500',
   fold: 'bg-red-500',
+}
+
+const MIX_CHIP: Record<string, string> = {
+  bet: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30',
+  raise: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30',
+  check: 'bg-stone-700/60 text-stone-200 border border-stone-600',
+  call: 'bg-sky-500/15 text-sky-300 border border-sky-500/30',
+  fold: 'bg-stone-800 text-stone-400 border border-stone-700',
+}
+
+const VERDICT_CHIP: Record<string, string> = {
+  call: 'bg-sky-600/80 text-white',
+  fold: 'bg-red-800/80 text-stone-100',
+  raise: 'bg-emerald-600/90 text-white',
+  mix: 'bg-amber-600/80 text-white',
+}
+
+const VERDICT_LABEL: Record<string, string> = {
+  call: 'Колл',
+  fold: 'Фолд',
+  raise: 'Рейз',
+  mix: 'Микс',
 }
 
 export function GtoView({ onBack, initial }: { onBack: () => void; initial?: GtoInitial | null }) {
@@ -60,6 +102,9 @@ export function GtoView({ onBack, initial }: { onBack: () => void; initial?: Gto
   const [opponents, setOpponents] = useState(initial?.opponents ?? 0) // 0 только для «открытия» на префлопе
   const [street, setStreet] = useState<Street>(initial?.street ?? 'preflop')
   const [situation, setSituation] = useState<'open' | 'vsraise'>(initial?.situation ?? 'open')
+  const [raiser, setRaiser] = useState<string>(() => (initial?.raiser ? basePos(initial.raiser) : 'CO'))
+  const [textureId, setTextureId] = useState('dry')
+  const [facing, setFacing] = useState<number>(0)
 
   const seats = seatsForTable(players)
   const maxOpp = Math.min(players - 1, 8)
@@ -84,21 +129,31 @@ export function GtoView({ onBack, initial }: { onBack: () => void; initial?: Gto
   const pos = basePos(seat)
   const callers = situation === 'vsraise' && street === 'preflop' ? Math.max(0, opponents - 1) : 0
 
+  // позиции рейзера, против которых защита валидна
+  const raiserOptions = useMemo(() => {
+    if (pos === 'UTG') return ['UTG'] // UTG1/UTG2 за 9-max — та же базовая позиция
+    const order = ['UTG', 'MP', 'CO', 'BTN', 'SB']
+    if (pos === 'BB') return order // BB защищается против любых рейзеров
+    return order.slice(0, order.indexOf(pos))
+  }, [pos])
+
+  const effectiveRaiser = (raiserOptions.includes(raiser) ? raiser : raiserOptions[raiserOptions.length - 1] ?? 'CO') as Position
+
   const holdemChart = useMemo(() => (street === 'preflop'
-    ? holdemPreflop(pos, players, situation, callers)
-    : null), [street, pos, players, situation, callers])
+    ? holdemPreflop(pos, players, situation, callers, effectiveRaiser)
+    : null), [street, pos, players, situation, callers, effectiveRaiser])
 
   const omahaChart = useMemo(() => (street === 'preflop' && game !== 'holdem'
-    ? omahaPreflop(game as 'omaha4' | 'omaha5', pos, players, situation, callers)
-    : null), [street, game, pos, players, situation, callers])
+    ? omahaPreflop(game as 'omaha4' | 'omaha5', pos, players, situation, callers, effectiveRaiser)
+    : null), [street, game, pos, players, situation, callers, effectiveRaiser])
 
-  const guide = useMemo(() => (street !== 'preflop'
-    ? postflopGuide(game, street, opponents, seat)
-    : null), [game, street, opponents, seat])
+  const plan = useMemo(() => (street !== 'preflop'
+    ? postflopPlan(game, street, TEXTURE_PRESETS.find((p) => p.id === textureId)?.codes.map((code) => parseCard(code) as PokerCard) ?? [], opponents, seat, facing > 0 ? facing : null)
+    : null), [game, street, opponents, seat, textureId, facing])
 
   const notes = useMemo(() => (street === 'preflop'
-    ? preflopNotes(game, pos, situation, callers)
-    : []), [game, street, pos, situation, callers])
+    ? preflopNotes(game, pos, situation, callers, effectiveRaiser, players)
+    : []), [game, street, pos, situation, callers, effectiveRaiser, players])
 
   const omahaOpenHands = useMemo(() => {
     if (street !== 'preflop' || game === 'holdem' || !omahaChart) return null
@@ -117,13 +172,10 @@ export function GtoView({ onBack, initial }: { onBack: () => void; initial?: Gto
     return omahaRangeComposition(game as 'omaha4' | 'omaha5', percent, 2500)
   }, [street, game, omahaChart, situation])
 
-  // демонстрационная рука Омахи для сетки действий «рейз/колл/фолд» не нужна:
-  // вместо сетки показываем примеры и состав диапазона
-
   return (
     <TrainerShell
       title="GTO-чарты"
-      subtitle="Стол, позиция, соперники и раунд — что играть, а что сбрасывать"
+      subtitle="Отдельные чарты для столов 2–9-max; защита против рейза — с учётом позиции рейзера"
       onBack={onBack}
     >
       <ScenarioCard>
@@ -175,6 +227,42 @@ export function GtoView({ onBack, initial }: { onBack: () => void; initial?: Gto
           </SelectorRow>
         )}
 
+        {/* Позиция рейзера (префлоп, против рейза) */}
+        {street === 'preflop' && situation === 'vsraise' && (
+          <SelectorRow label="Кто рейзил">
+            {raiserOptions.map((r) => (
+              <button key={r} type="button" onClick={() => setRaiser(r)} className={btnCls(effectiveRaiser === r)} title={SEAT_NAMES_RU[r] ?? r}>
+                {r}
+              </button>
+            ))}
+            <span className="text-xs text-stone-500 ml-1">
+              чем позже рейзер, тем шире защита
+            </span>
+          </SelectorRow>
+        )}
+
+        {/* Текстура доски (постфлоп) */}
+        {street !== 'preflop' && (
+          <SelectorRow label="Доска">
+            {TEXTURE_PRESETS.map((p) => (
+              <button key={p.id} type="button" onClick={() => setTextureId(p.id)} className={btnCls(textureId === p.id)}>
+                {p.label}
+              </button>
+            ))}
+          </SelectorRow>
+        )}
+
+        {/* Размер ставки оппонента (постфлоп) */}
+        {street !== 'preflop' && (
+          <SelectorRow label="Ставка оппонента">
+            {FACING_OPTIONS.map((o) => (
+              <button key={o.pct} type="button" onClick={() => setFacing(o.pct)} className={btnCls(facing === o.pct)}>
+                {o.label}
+              </button>
+            ))}
+          </SelectorRow>
+        )}
+
         {/* Соперники */}
         <SelectorRow label={street === 'preflop' && situation === 'open' ? 'Лимпов до вас' : 'Соперников в банке'}>
           {Array.from({ length: (street === 'preflop' && situation === 'open' ? maxOpp + 1 : maxOpp) }, (_, i) => (
@@ -200,7 +288,7 @@ export function GtoView({ onBack, initial }: { onBack: () => void; initial?: Gto
 
       {/* Результат: префлоп */}
       {street === 'preflop' && game === 'holdem' && holdemChart && (
-        <PreflopHoldem chart={holdemChart} pos={pos} players={players} situation={situation} opponents={opponents} notes={notes} />
+        <PreflopHoldem chart={holdemChart} pos={pos} players={players} situation={situation} raiser={effectiveRaiser} opponents={opponents} notes={notes} />
       )}
 
       {street === 'preflop' && game !== 'holdem' && omahaChart && (
@@ -209,6 +297,8 @@ export function GtoView({ onBack, initial }: { onBack: () => void; initial?: Gto
           chart={omahaChart}
           pos={pos}
           situation={situation}
+          raiser={effectiveRaiser}
+          players={players}
           opponents={opponents}
           notes={notes}
           openHands={omahaOpenHands}
@@ -218,38 +308,38 @@ export function GtoView({ onBack, initial }: { onBack: () => void; initial?: Gto
       )}
 
       {/* Результат: постфлоп */}
-      {street !== 'preflop' && guide && (
+      {street !== 'preflop' && plan && (
         <Card className="border-stone-800 bg-stone-900/60">
           <CardContent className="p-4 sm:p-6 flex flex-col gap-4">
-            <h2 className="text-sm font-normal text-stone-100">{guide.intro}</h2>
-            <p className="text-xs text-stone-400">{guide.gameNote}</p>
+            <h2 className="text-sm font-normal text-stone-100">{plan.intro}</h2>
+            <div className="rounded-lg border border-stone-800 bg-neutral-900/50 p-3 flex flex-col gap-1">
+              <p className="text-xs font-normal text-amber-200">{plan.textureLabel}</p>
+              <p className="text-xs text-stone-300">{plan.textureNote}</p>
+            </div>
+            {plan.facingLabel && (
+              <p className="text-xs text-sky-300">Сценарий: {plan.facingLabel.toLowerCase()} — ниже вердикты и границы по каждому тиру</p>
+            )}
 
             <div className="flex flex-col gap-2">
-              {guide.tiers.map((t) => (
-                <div key={t.tier} className="rounded-lg border border-stone-800 bg-stone-900/80 p-3 flex flex-col gap-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className={cn('w-2.5 h-2.5 rounded-full shrink-0', TIER_DOT[t.action])} />
-                    <span className="text-sm font-normal text-stone-100">{t.tier}</span>
-                    <span className="text-xs text-stone-500">{t.examples}</span>
-                  </div>
-                  <p className="text-xs text-stone-300 pl-4"><span className="text-emerald-400">На инициативе:</span> {t.aggressive}</p>
-                  <p className="text-xs text-stone-300 pl-4"><span className="text-sky-400">Против ставки:</span> {t.facingBet}</p>
-                </div>
+              {plan.tiers.map((t) => (
+                <TierCard key={t.tier} t={t} facingPct={facing > 0 ? facing : null} />
               ))}
             </div>
 
             <div className="rounded-lg border border-stone-800 bg-neutral-900/50 p-3">
-              <p className="text-xs text-stone-200">{guide.multiwayNote}</p>
+              <p className="text-xs text-stone-200">{plan.multiwayNote}</p>
             </div>
-            <p className="text-xs text-stone-400">{guide.positionNote}</p>
+            <p className="text-xs text-stone-400">{plan.positionNote}</p>
+            <p className="text-xs text-stone-500">{plan.gameNote}</p>
           </CardContent>
         </Card>
       )}
 
       <p className="text-xs text-stone-500 leading-relaxed">
-        Чарты упрощены для обучения: GTO-стратегии в реальности зависят от стеков, тендеров доски, типов
-        оппонентов и динамики раздачи. Диапазоны Омахи оцениваются по структуре руки (тузы, мастевость,
-        связки, пары) и заданы как «топ N%» стартовых рук.
+        Чарты упрощены для обучения: для каждого размера стола 2–9-max задан свой диапазон открытия; ширина
+        защиты против рейза зависит от позиции рейзера. Постфлоп-план учитывает текстуру доски, размер ставки
+        оппонента и смешанные частоты, но в реальной GTO-стратегии значения ещё зависят от стеков, тендеров и
+        типов оппонентов. Диапазоны Омахи оцениваются по структуре руки (тузы, мастевость, связки, пары).
       </p>
     </TrainerShell>
   )
@@ -299,13 +389,45 @@ function NotesList({ notes }: { notes: string[] }) {
   )
 }
 
+function TierCard({ t, facingPct }: { t: TierPlan; facingPct: number | null }) {
+  return (
+    <div className="rounded-lg border border-stone-800 bg-stone-900/80 p-3 flex flex-col gap-1.5">
+      <div className="flex items-center gap-2">
+        <span className={cn('w-2.5 h-2.5 rounded-full shrink-0', TIER_DOT[t.action])} />
+        <span className="text-sm font-normal text-stone-100">{t.tier}</span>
+        <span className="text-xs text-stone-500">{t.examples}</span>
+      </div>
+      <p className="text-xs text-stone-300 pl-4"><span className="text-emerald-400">На инициативе:</span> {t.line}</p>
+      <div className="flex flex-wrap gap-1.5 pl-4">
+        {t.mix.map((m, i) => (
+          <span key={i} className={cn('px-2 py-0.5 rounded text-[11px] font-normal', MIX_CHIP[m.action] ?? MIX_CHIP.fold)}>
+            {m.label}
+          </span>
+        ))}
+      </div>
+      <p className="text-xs text-stone-400 pl-4">{t.sizeNote}</p>
+      {facingPct != null && t.verdict && (
+        <div className="pl-4 flex items-center gap-2 flex-wrap">
+          <span className={cn('px-2 py-0.5 rounded text-[11px] font-normal', VERDICT_CHIP[t.verdict.verdict])}>
+            {VERDICT_LABEL[t.verdict.verdict]}
+          </span>
+          <span className="text-xs text-stone-300">{t.verdict.note}</span>
+        </div>
+      )}
+      <p className="text-xs text-stone-400 pl-4"><span className="text-sky-400">Границы:</span> {t.vsBetNote}</p>
+      {t.textureNote && <p className="text-xs text-amber-300/70 pl-4">Текстура: {t.textureNote}</p>}
+    </div>
+  )
+}
+
 function PreflopHoldem({
-  chart, pos, players, situation, opponents, notes,
+  chart, pos, players, situation, raiser, opponents, notes,
 }: {
   chart: ReturnType<typeof holdemPreflop>
   pos: string
   players: number
   situation: 'open' | 'vsraise'
+  raiser: string
   opponents: number
   notes: string[]
 }) {
@@ -328,8 +450,8 @@ function PreflopHoldem({
         <LegendHoldem situation={situation} />
         <p className="text-xs text-stone-400">
           {situation === 'open'
-            ? `Открытие с ${pos} за столом ${players}-max${opponents > 0 ? ` против ${opponents} лимпов: рейз чуть тайтовее` : ''}.`
-            : `Против рейза с ${pos}${opponents > 1 ? ` и ${opponents - 1} колл${opponents - 1 === 1 ? 'ом' : 'ами'}` : ''}.`}
+            ? `Открытие с ${pos} за столом ${players}-max${opponents > 0 ? ` против ${opponents} лимпов: рейз чуть тайтовее` : ''} — отдельный чарт под этот размер стола.`
+            : `Защита ${pos} против открытия с ${raiser} за столом ${players}-max${opponents > 1 ? ` и ${opponents - 1} колл${opponents - 1 === 1 ? 'ом' : 'ами'}` : ''}.`}
         </p>
         <NotesList notes={notes} />
       </CardContent>
@@ -356,12 +478,14 @@ function LegendHoldem({ situation }: { situation: 'open' | 'vsraise' }) {
 }
 
 function PreflopOmaha({
-  game, chart, pos, situation, opponents, notes, openHands, callHands, composition,
+  game, chart, pos, situation, raiser, players, opponents, notes, openHands, callHands, composition,
 }: {
   game: 'omaha4' | 'omaha5'
   chart: ReturnType<typeof omahaPreflop>
   pos: string
   situation: 'open' | 'vsraise'
+  raiser: string
+  players: number
   opponents: number
   notes: string[]
   openHands: PokerCard[][] | null
@@ -432,12 +556,11 @@ function PreflopOmaha({
 
         <p className="text-xs text-stone-400">
           {situation === 'open'
-            ? `Открытие с ${pos} (${game === 'omaha4' ? 'PLO4' : 'PLO5'})${opponents > 0 ? ` против ${opponents} лимп${opponents === 1 ? 'а' : 'ов'}: чуть тайтовее` : ''}.`
-            : `Против рейза с ${pos}${opponents > 1 ? ` и ${opponents - 1} колл${opponents - 1 === 1 ? 'ом' : 'ами'}` : ''}.`}
+            ? `Открытие с ${pos} (${game === 'omaha4' ? 'PLO4' : 'PLO5'}) за столом ${players}-max${opponents > 0 ? ` против ${opponents} лимп${opponents === 1 ? 'а' : 'ов'}: чуть тайтовее` : ''} — отдельный чарт под этот размер стола.`
+            : `Защита ${pos} против открытия с ${raiser} (${game === 'omaha4' ? 'PLO4' : 'PLO5'}, стол ${players}-max)${opponents > 1 ? ` и ${opponents - 1} колл${opponents - 1 === 1 ? 'ом' : 'ами'}` : ''}.`}
         </p>
         <NotesList notes={notes} />
       </CardContent>
     </Card>
   )
 }
-

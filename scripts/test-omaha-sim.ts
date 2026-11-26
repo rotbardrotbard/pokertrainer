@@ -213,7 +213,7 @@ function hasDuplicates(cards: Card[]): boolean {
         const expected = omahaAction(game, s.hero, s.chart!, situation)
         assert(s.correctAction === expected, `preflop action match ${s.kind} #${t}`)
         // чарт соответствует параметрам позиции/стола/ситуации
-        const ref = omahaPreflop(game, s.position, s.players, situation, 0)
+        const ref = omahaPreflop(game, s.position, s.players, situation, 0, s.raiser)
         if (s.kind === 'open') {
           assert(s.chart!.openPercent === ref.openPercent, `open chart matches #${t}`)
           assert(Math.round(s.chart!.openPercent) !== 0, 'open percent nonzero')

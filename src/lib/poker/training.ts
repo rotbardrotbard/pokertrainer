@@ -5,7 +5,7 @@ import {
 import { evaluate7, handName, handCategoryName } from './evaluator'
 import { simulateEquity, countOuts } from './equity'
 import {
-  Position, openRangeClasses, vsRaiseClasses, handClass, handInSet,
+  Position, openRangeClassesFor, vsRaiseCharts, handClass, handInSet,
   rangePercent, topPercentClasses, POSITION_NAMES_RU, classesToCombos,
 } from './ranges'
 
@@ -562,7 +562,7 @@ export function genOpenScenario(): SimScenarioBase {
   const pos = pick<Position>(['UTG', 'MP', 'CO', 'BTN', 'SB'])
   const deck = shuffledDeck()
   const hero = [deck[0], deck[1]]
-  const range = openRangeClasses(pos)
+  const range = openRangeClassesFor(pos, 6)
   const inRange = handInSet(hero[0], hero[1], range)
   const pct = rangePercent(range).toFixed(0)
   const cls = handClass(hero[0], hero[1])
@@ -586,16 +586,19 @@ export function genOpenScenario(): SimScenarioBase {
   }
 }
 
-/** Префлоп: против рейза */
+/** Префлоп: против рейза — чарт зависит и от позиции защитника, и от позиции рейзера */
 export function genVsRaiseScenario(): SimScenarioBase {
-  const villainPos = pick<Position>(['UTG', 'MP', 'CO', 'BTN'])
-  const heroPos = pick<Position>(['MP', 'CO', 'BTN', 'SB', 'BB'])
+  const order: Position[] = ['UTG', 'MP', 'CO', 'BTN', 'SB', 'BB']
+  const heroIdx = 1 + ri(5) // MP..BB
+  const villainIdx = ri(Math.min(heroIdx, 4)) // рейзер — UTG..BTN, всегда раньше героя
+  const villainPos = order[villainIdx]
+  const heroPos = order[heroIdx]
   const deck = shuffledDeck()
   const hero = [deck[0], deck[1]]
-  const { threeBet, call } = vsRaiseClasses(heroPos)
+  const chart = vsRaiseCharts(heroPos, villainPos, 6)
   const cls = handClass(hero[0], hero[1])
-  const isThreeBet = threeBet.has(cls)
-  const isCall = !isThreeBet && call.has(cls)
+  const isThreeBet = chart ? chart.threeBet.has(cls) : false
+  const isCall = chart ? !isThreeBet && chart.call.has(cls) : false
   const openSize = 2.5
   const correctAction: SimAction = isThreeBet ? 'raise' : isCall ? 'call' : 'fold'
   const raiseLabel = isThreeBet
@@ -611,10 +614,13 @@ export function genVsRaiseScenario(): SimScenarioBase {
     explanation: isThreeBet
       ? `${cls} — премиум-рука: делайте 3бет для вэлью и инициативы.`
       : isCall
-        ? `${cls} — играбельная рука: колл в позиции (спекулятивный потенциал).`
-        : `${cls} — слабее диапазона защиты против рейза: сбрасывайте.`,
+        ? `${cls} — играбельная рука: колл против открытия с ${villainPos} (${heroPos === 'SB' || heroPos === 'BB' ? 'без позиции' : 'в позиции'}).`
+        : `${cls} — слабее диапазона защиты ${heroPos} против открытия с ${villainPos}: сбрасывайте.`,
     detail: [
-      'Против рейза защищайте руки с эквити и играбельностью (пары, одномастные, бродвеи).',
+      chart
+        ? `Защита ${heroPos} против ${villainPos}: 3бет ≈ топ ${chart.threeBetPct.toFixed(0)}%, колл ≈ топ ${chart.callPct.toFixed(0)}% рук.`
+        : 'Чарт защиты недоступен для этой пары позиций.',
+      `Ширина защиты зависит от позиции рейзера: против поздних открытий (CO/BTN) коллы заметно шире, чем против UTG/MP.`,
       'Премиум-руки 3бетят, спекулятивные — коллируют, мусор — фолд.',
     ],
     pot: 1.5 + openSize,

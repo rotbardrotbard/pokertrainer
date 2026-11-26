@@ -224,23 +224,257 @@ export function topPercentClasses(percent: number): Set<string> {
 
 /** Классы 3бета и колла против рейза (упрощённо): премиум → 3бет, играбельное → колл */
 export function vsRaiseClasses(pos: Position): { threeBet: Set<string>; call: Set<string> } {
-  // Диапазон защиты зависит от позиции рейзера; упрощаем: единый разумный чарт
-  const threeBet = new Set([
-    'AA', 'KK', 'QQ', 'JJ', 'AKs', 'AQs', 'AKo', 'AQo',
-    '99', 'TT', 'AJs', 'KQs', 'A5s', 'A4s', 'KJs',
-  ])
-  const call = new Set<string>()
-  const callList = [
-    '77', '88', '66', '55', '44', '33', '22',
-    'ATs', 'A9s', 'A8s', 'A7s', 'A6s', 'A3s', 'A2s',
-    'KJs', 'KTs', 'K9s', 'K8s', 'K7s', 'K6s', 'K5s',
-    'QJs', 'QTs', 'Q9s', 'Q8s', 'JTs', 'J9s', 'J8s',
-    'T9s', 'T8s', '98s', '97s', '87s', '76s', '65s', '54s',
-    'AJo', 'ATo', 'KQo', 'KJo',
-  ]
-  for (const c of callList) call.add(c)
-  void pos
-  return { threeBet, call }
+  const c = vsRaiseCharts(pos, 'CO') ?? { threeBet: new Set<string>(), call: new Set<string>() }
+  return { threeBet: c.threeBet, call: c.call }
+}
+
+// ---------- Компактная нотация чартов ----------
+
+function pairClass(r: number): string {
+  const c = rankChar(r)
+  return c + c
+}
+
+/** Разбор компактной записи диапазона: 'AA-TT,A5s-A2s,T9s-76s,K9s+,AQs+,KQo'. */
+export function parseClasses(spec: string): Set<string> {
+  const out = new Set<string>()
+  for (const raw of spec.split(',')) {
+    const tok = raw.trim()
+    if (!tok) continue
+    if (tok.includes('-')) {
+      const parts = tok.split('-')
+      if (parts.length === 2) expandDash(parts[0], parts[1], out)
+    } else if (tok.endsWith('+')) {
+      expandPlus(tok.slice(0, -1), out)
+    } else {
+      out.add(tok)
+    }
+  }
+  return out
+}
+
+/** '77-22' (пары), 'A5s-A2s' (одинаковая старшая), 'T9s-76s' (коннекторы). */
+function expandDash(a: string, b: string, out: Set<string>) {
+  if (a.length === 2 && b.length === 2) {
+    let r = rankVal(a[0])
+    const end = rankVal(b[0])
+    const step = r <= end ? 1 : -1
+    for (;;) {
+      out.add(pairClass(r))
+      if (r === end) break
+      r += step
+    }
+    return
+  }
+  const hiA = rankVal(a[0]), loA = rankVal(a[1]), hiB = rankVal(b[0]), loB = rankVal(b[1]), suit = a[2]
+  if (hiA === hiB) {
+    const step = loA <= loB ? 1 : -1
+    for (let lo = loA;; lo += step) {
+      out.add(a[0] + rankChar(lo) + suit)
+      if (lo === loB) break
+    }
+  } else if (hiA - loA === hiB - loB) {
+    const step = hiA <= hiB ? 1 : -1
+    for (let hi = hiA;; hi += step) {
+      out.add(rankChar(hi) + rankChar(hi - 1) + suit)
+      if (hi === hiB) break
+    }
+  }
+}
+
+/** 'TT+' → TT..AA; 'K9s+' → K9s..KQs; 'AQs+' → AQs, AKs. */
+function expandPlus(base: string, out: Set<string>) {
+  if (base.length === 2) {
+    const r = rankVal(base[0])
+    for (let i = r; i <= 14; i++) out.add(pairClass(i))
+    return
+  }
+  const hi = rankVal(base[0])
+  for (let lo = rankVal(base[1]); lo < hi; lo++) out.add(base[0] + rankChar(lo) + base[2])
+}
+
+const parseCache = new Map<string, Set<string>>()
+
+function parseCached(spec: string): Set<string> {
+  const hit = parseCache.get(spec)
+  if (hit) return hit
+  const set = parseClasses(spec)
+  parseCache.set(spec, set)
+  return set
+}
+
+// ---------- Защита против рейза: позиция рейзера имеет значение ----------
+
+/**
+ * Ширина колла защиты (% комбинаций) по паре «защитник × позиция рейзера».
+ * BB против BTN/SB открывшегося защищается в 1,5–2,5 раза шире, чем против UTG.
+ */
+const CALL_PCT: Partial<Record<Position, Partial<Record<Position, number>>>> = {
+  UTG: { UTG: 6.5 }, // UTG против открытия UTG1/UTG2 (9-max)
+  MP: { UTG: 7.5 },
+  CO: { UTG: 8.5, MP: 10 },
+  BTN: { UTG: 9.5, MP: 11.5, CO: 13.5 },
+  SB: { UTG: 7, MP: 8.5, CO: 10.5, BTN: 13 },
+  BB: { UTG: 16, MP: 19, CO: 24, BTN: 31, SB: 40 },
+}
+
+/** Спецификация 3бета по той же паре: против поздних рейзеров диапазон шире и поляризованнее. */
+const THREEBET_SPECS: Partial<Record<Position, Partial<Record<Position, string>>>> = {
+  UTG: { UTG: 'QQ+,AKs,AKo' },
+  MP: { UTG: 'QQ+,AKs,AKo' },
+  CO: { UTG: 'QQ+,AKs,AKo,A5s,A4s', MP: 'JJ+,AQs+,AKo,A5s,A4s' },
+  BTN: { UTG: 'JJ+,AQs+,AKo,A5s,A4s', MP: 'JJ+,AQs+,AKo,A5s-A2s,KQs', CO: 'TT+,AJs+,AKo,A5s-A2s,KQs' },
+  SB: { UTG: 'QQ+,AQs+,AKo,A5s-A4s', MP: 'JJ+,AQs+,AKo,A5s-A2s,KQs', CO: 'JJ+,AQs+,AKo,A5s-A2s,KQs,KJs', BTN: 'TT+,AJs+,AKo,A5s-A2s,KQs,KJs,QJs' },
+  BB: { UTG: 'QQ+,AKs,AKo', MP: 'QQ+,AQs+,AKo,A5s,A4s', CO: 'JJ+,AQs+,AKo,A5s-A2s,KQs', BTN: 'TT+,AJs+,AKo,A5s-A2s,KQs,KJs,QTs', SB: '99+,AJs+,AKo,A5s-A2s,KQs,KJs,QJs,JTs' },
+}
+
+/** Отдельные множители ширины защиты под размер стола (не формула). */
+export const SIZE_DEF_FACTOR: Record<number, number> = {
+  2: 1.5, 3: 1.35, 4: 1.2, 5: 1.1, 6: 1.0, 7: 0.94, 8: 0.88, 9: 0.82,
+}
+
+// порядок добора рук в колл: пары → suited-тузы → suited бродвей/коннекторы → старшие пары → оффсьют
+const CALL_CORE: string[] = [
+  '99', '88', '77', '66', '55', '44', '33', '22',
+  'A5s', 'A4s', 'A3s', 'A2s', 'A9s', 'A8s', 'A7s', 'A6s',
+  'KQs', 'KJs', 'KTs', 'K9s', 'QJs', 'QTs', 'Q9s', 'JTs', 'J9s', 'T9s', '98s', '87s', '76s', '65s', '54s',
+  'JJ', 'TT',
+]
+const CALL_OFF_IP: string[] = ['AQo', 'AJo', 'KQo', 'ATo', 'KJo', 'QJo', 'JTo', 'KTo', 'QTo', 'K9o', 'A9o']
+const CALL_OFF_WIDE: string[] = ['Q9o', 'J9o', 'T9o', '98o', 'A8o', 'K8o', 'A7o', 'Q8o', 'J8o', 'T8o', '97o', '96o', '87o', '76o', '65o', 'A6o', 'K7o', 'Q7o', 'J7o', 'T7o']
+// дополнительный пул для коротких столов (HU/3-max): BB защищается очень широко
+const CALL_OFF_HU: string[] = ['A5o', 'A4o', 'K6o', 'K5o', 'Q6o', 'J6o', 'T6o', '54o', 'A3o', 'A2o', 'K4o', 'K3o', 'K2o', 'Q5o', 'J5o', 'T5o', '95o']
+
+const callSetCache = new Map<string, Set<string>>()
+
+/** Колл-чарт защитника заданной ширины: IP — с оффсьют-бродвеями, SB — только suited/пары, BB — всё. */
+function buildCallSet(defender: Position, targetPct: number): Set<string> {
+  const pct = Math.max(4, Math.min(70, targetPct))
+  const key = `${defender}:${pct.toFixed(1)}`
+  const hit = callSetCache.get(key)
+  if (hit) return hit
+  const order = defender === 'BB'
+    ? [...CALL_CORE, ...CALL_OFF_IP, ...CALL_OFF_WIDE, ...CALL_OFF_HU]
+    : defender === 'SB'
+      ? CALL_CORE
+      : [...CALL_CORE, ...CALL_OFF_IP]
+  const target = (pct / 100) * 1326
+  const set = new Set<string>()
+  let combos = 0
+  for (const cls of order) {
+    if (combos >= target) break
+    set.add(cls)
+    combos += classCombos(cls)
+  }
+  callSetCache.set(key, set)
+  return set
+}
+
+export interface VsRaiseChart {
+  threeBet: Set<string>
+  call: Set<string>
+  threeBetPct: number
+  callPct: number
+}
+
+const vsCache = new Map<string, VsRaiseChart | null>()
+
+/**
+ * Чарт защиты против рейза: зависит и от защитника, и от позиции рейзера.
+ * Возвращает null для невозможных сочетаний (рейзер действует после защитника).
+ */
+export function vsRaiseCharts(defender: Position, raiser: Position, players = 6, callerFactor = 1): VsRaiseChart | null {
+  const key = `${defender}|${raiser}|${players}|${callerFactor.toFixed(2)}`
+  const hit = vsCache.get(key)
+  if (hit !== undefined) return hit
+  const tbSpec = THREEBET_SPECS[defender]?.[raiser]
+  const callBase = CALL_PCT[defender]?.[raiser]
+  let chart: VsRaiseChart | null = null
+  if (tbSpec && callBase != null) {
+    let spec = tbSpec
+    if (players <= 3) spec += ',QJs,JTs,KTs,QTs' // короткие столы: 3бет шире
+    const threeBet = parseCached(spec)
+    const cap = players <= 3 ? 68 : 62
+    const callPct = Math.min(cap, Math.max(4, callBase * (SIZE_DEF_FACTOR[players] ?? 1) * callerFactor))
+    const call = buildCallSet(defender, callPct)
+    chart = { threeBet, call, threeBetPct: rangePercent(threeBet), callPct: rangePercent(call) }
+  }
+  vsCache.set(key, chart)
+  return chart
+}
+
+/** Позиция рейзера по умолчанию для защитника (ближайшая ранняя позиция). */
+export const DEFAULT_RAISER: Record<Position, Position> = {
+  UTG: 'UTG', MP: 'UTG', CO: 'MP', BTN: 'CO', SB: 'BTN', BB: 'CO',
+}
+
+/** Позиции рейзера, против которых защитник действует валидно. */
+export function validRaisersFor(defender: Position): Position[] {
+  if (defender === 'UTG') return ['UTG'] // против UTG1/UTG2 (9-max) — та же базовая позиция
+  const order: Position[] = ['UTG', 'MP', 'CO', 'BTN', 'SB']
+  if (defender === 'BB') return order // BB защищается против любых рейзеров
+  return order.slice(0, order.indexOf(defender))
+}
+
+// ---------- Отдельные чарты открытия под каждый размер стола ----------
+
+/**
+ * Целевая ширина открытия (% комбинаций от 1326) для КАЖДОГО размера стола 2–9-max.
+ * Чарт каждой позиции/размера строится из правил OPEN_RULES подгонкой под эту ширину.
+ */
+export const OPEN_PCT_SIZE: Partial<Record<number, Partial<Record<Position, number>>>> = {
+  2: { UTG: 28, MP: 34, CO: 44, BTN: 72, SB: 56 },
+  3: { UTG: 25, MP: 30, CO: 38, BTN: 61, SB: 50 },
+  4: { UTG: 22, MP: 27, CO: 35, BTN: 55, SB: 45 },
+  5: { UTG: 19, MP: 24, CO: 31, BTN: 52, SB: 41 },
+  6: { UTG: 16, MP: 20, CO: 26, BTN: 46, SB: 36 },
+  7: { UTG: 14, MP: 17, CO: 23, BTN: 36, SB: 29 },
+  8: { UTG: 13, MP: 16, CO: 21, BTN: 31, SB: 27 },
+  9: { UTG: 12, MP: 15, CO: 19, BTN: 28, SB: 25 },
+}
+
+const fitCache = new Map<string, Set<string>>()
+
+/** Диапазон открытия с позиции за столом players: отдельный чарт под каждый размер стола. */
+export function openRangeClassesFor(pos: Position, players: number): Set<string> {
+  if (pos === 'BB') return openRangeClasses(pos)
+  const target = OPEN_PCT_SIZE[players]?.[pos]
+  if (target == null) return openRangeClasses(pos)
+  const key = `${pos}:${players}`
+  const hit = fitCache.get(key)
+  if (hit) return hit
+  const set = fitClassesToPct(openRangeClasses(pos), target)
+  fitCache.set(key, set)
+  return set
+}
+
+/** Подгонка набора классов под целевую ширину: добавляем сильнейшие недостающие или убираем слабейшие. */
+function fitClassesToPct(base: Set<string>, targetPct: number): Set<string> {
+  const target = (targetPct / 100) * 1326
+  const combos = (set: Set<string>) => {
+    let c = 0
+    for (const cls of set) c += classCombos(cls)
+    return c
+  }
+  const out = new Set(base)
+  const ordered = orderedClasses()
+  if (combos(out) < target) {
+    for (const cls of ordered) {
+      if (combos(out) >= target) break
+      if (!out.has(cls)) out.add(cls)
+    }
+  } else {
+    for (const cls of [...ordered].reverse()) {
+      if (combos(out) <= target) break
+      if (out.has(cls) && combos(out) - classCombos(cls) >= 6) out.delete(cls)
+    }
+  }
+  return out
+}
+
+/** Ширина открытия (% комбинаций) для позиции и размера стола — для подписей UI. */
+export function openPercentFor(pos: Position, players: number): number {
+  return rangePercent(openRangeClassesFor(pos, players))
 }
 
 /** Проверка руки по классу с учётом диапазона */
