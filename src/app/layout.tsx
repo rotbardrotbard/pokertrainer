@@ -15,17 +15,14 @@ const cormorant = Cormorant_Garamond({
 });
 
 export const metadata: Metadata = {
-  title: "Покер Тренажёр — бесплатная тренировка покерных навыков",
+  title: "Suited — бесплатная тренировка покерных навыков",
   description:
-    "Бесплатный тренажёр Texas Hold'em и Омахи: симулятор раздач, математика и пот-оддсы, аутсы и эквити, EV, определение победителя, Омаха с двумя досками (4-card и 5-card), диапазоны префлоп и калькулятор эквити. Без регистрации и подписок.",
-  keywords: ["покер", "тренажёр", "Texas Holdem", "Омаха", "Omaha", "PLO", "эквити", "аутсы", "пот-оддсы", "GTO", "диапазоны"],
-  icons: {
-    icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♠</text></svg>",
-  },
+    "Suited — бесплатный тренажёр Texas Hold'em и Омахи: симулятор раздач, математика и пот-оддсы, аутсы и эквити, EV, теория покера, Омаха с двумя досками (4-card и 5-card), диапазоны префлоп и калькулятор эквити. Без регистрации и подписок.",
+  keywords: ["покер", "тренажёр", "Suited", "Texas Holdem", "Омаха", "Omaha", "PLO", "эквити", "аутсы", "пот-оддсы", "GTO", "диапазоны"],
 };
 
 export const viewport: Viewport = {
-  themeColor: "#081511",
+  themeColor: "#15171b",
   width: "device-width",
   initialScale: 1,
 };

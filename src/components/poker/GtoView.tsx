@@ -238,7 +238,7 @@ export function GtoView({ onBack, initial }: { onBack: () => void; initial?: Gto
               ))}
             </div>
 
-            <div className="rounded-lg border border-emerald-900/60 bg-emerald-950/30 p-3">
+            <div className="rounded-lg border border-stone-800 bg-neutral-900/50 p-3">
               <p className="text-xs text-stone-200">{guide.multiwayNote}</p>
             </div>
             <p className="text-xs text-stone-400">{guide.positionNote}</p>

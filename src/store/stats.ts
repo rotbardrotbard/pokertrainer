@@ -20,10 +20,12 @@ function emptyT(): TrainerStats {
 
 interface StatsState {
   stats: Record<TrainerId, TrainerStats>
+  /** статистика по типам задач: ключ 'math:potOdds', 'outs:Флеш-дро' и т.п. */
+  kindStats: Record<string, { attempts: number; correct: number }>
   streak: number
   bestStreak: number
   lastPlayedDate: string | null
-  recordAnswer: (trainer: TrainerId, correct: boolean) => void
+  recordAnswer: (trainer: TrainerId, correct: boolean, kind?: string) => void
   recordHint: (trainer: TrainerId) => void
   recordExam: (trainer: TrainerId, correct: number, total: number) => void
   resetSession: (trainer: TrainerId) => void
@@ -52,10 +54,11 @@ export const useStats = create<StatsState>()(
   persist(
     (set, get) => ({
       stats: emptyStats(),
+      kindStats: {},
       streak: 0,
       bestStreak: 0,
       lastPlayedDate: null,
-      recordAnswer: (trainer, correct) => {
+      recordAnswer: (trainer, correct, kind) => {
         const s = get()
         // защита от старых сохранений без новых режимов
         const t = s.stats[trainer] ?? emptyT()
@@ -82,6 +85,19 @@ export const useStats = create<StatsState>()(
           bestStreak,
           lastPlayedDate: today,
         })
+        // статистика по типу задачи (математика: вид; аутсы: сценарий)
+        if (kind) {
+          const cur = get().kindStats[kind] ?? { attempts: 0, correct: 0 }
+          set({
+            kindStats: {
+              ...get().kindStats,
+              [kind]: {
+                attempts: cur.attempts + 1,
+                correct: cur.correct + (correct ? 1 : 0),
+              },
+            },
+          })
+        }
       },
       recordHint: (trainer) => {
         const s = get()
@@ -112,7 +128,7 @@ export const useStats = create<StatsState>()(
           stats: { ...s.stats, [trainer]: { ...t, sessionAttempts: 0, sessionCorrect: 0 } },
         })
       },
-      resetAll: () => set({ stats: emptyStats(), streak: 0, lastPlayedDate: null }),
+      resetAll: () => set({ stats: emptyStats(), kindStats: {}, streak: 0, lastPlayedDate: null }),
     }),
     {
       name: 'poker-trainer-stats',
@@ -123,7 +139,7 @@ export const useStats = create<StatsState>()(
         for (const k of Object.keys(merged) as TrainerId[]) {
           merged[k] = { ...merged[k], ...(p.stats?.[k] ?? {}) }
         }
-        return { ...current, ...p, stats: merged }
+        return { ...current, ...p, stats: merged, kindStats: p.kindStats ?? {} }
       },
     },
   ),

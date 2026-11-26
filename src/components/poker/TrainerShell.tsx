@@ -47,7 +47,7 @@ export function TrainerShell({ title, subtitle, trainerId, onBack, children }: T
       </div>
 
       <div>
-        <h1 className="text-xl sm:text-2xl font-light text-stone-50">{title}</h1>
+        <h1 className="text-2xl sm:text-3xl font-light text-stone-50">{title}</h1>
         <p className="text-sm text-stone-400">{subtitle}</p>
       </div>
 
@@ -72,7 +72,7 @@ export function Feedback({ correct, headline, explanation, detail, onNext, nextL
       correct ? 'border-emerald-600/60 bg-emerald-950/30' : 'border-red-600/60 bg-red-950/30',
     )}>
       <CardContent className="p-4 sm:p-5 flex flex-col gap-3">
-        <div className={cn('flex items-center gap-2 font-normal text-base', correct ? 'text-emerald-400' : 'text-red-400')}>
+        <div className={cn('flex items-center gap-2 font-normal text-lg', correct ? 'text-emerald-400' : 'text-red-400')}>
           {correct ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
           {headline}
         </div>
@@ -93,8 +93,43 @@ export function Feedback({ correct, headline, explanation, detail, onNext, nextL
 /** Карточка-сценарий вопроса */
 export function ScenarioCard({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <Card className="border-stone-800 bg-gradient-to-b from-emerald-900/60 to-emerald-950/80 shadow-lg shadow-black/30">
+    <Card className={cn('border-stone-800 bg-gradient-to-b from-neutral-800/80 to-neutral-900/90 shadow-lg shadow-black/30', className)}>
       <CardContent className="p-4 sm:p-6 flex flex-col gap-4">{children}</CardContent>
     </Card>
+  )
+}
+
+/** Панель точности по типам задач (математика — виды, аутсы — сценарии) */
+export interface KindStatRow {
+  key: string
+  label: string
+  stat?: { attempts: number; correct: number }
+}
+
+export function KindStatsPanel({ rows, title = 'Точность по типам задач' }: { rows: KindStatRow[]; title?: string }) {
+  const withData = rows.filter((r) => r.stat && r.stat.attempts > 0)
+  if (withData.length === 0) return null
+  return (
+    <div className="rounded-lg border border-stone-700/70 bg-stone-900/70 p-3 flex flex-col gap-1.5">
+      <p className="text-xs font-normal text-stone-200">{title}</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+        {rows
+          .filter((r) => r.stat && r.stat.attempts > 0)
+          .map((r) => {
+            const acc = accuracy(r.stat!.correct, r.stat!.attempts)
+            return (
+              <div key={r.key} className="flex items-center justify-between gap-2 text-xs">
+                <span className="text-stone-400 truncate">{r.label}</span>
+                <span className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-stone-500">{r.stat!.attempts} отв.</span>
+                  <span className={cn('font-normal w-11 text-right', acc! >= 70 ? 'text-emerald-400' : acc! >= 50 ? 'text-amber-400' : 'text-red-400')}>
+                    {acc}%
+                  </span>
+                </span>
+              </div>
+            )
+          })}
+      </div>
+    </div>
   )
 }

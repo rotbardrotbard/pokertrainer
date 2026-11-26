@@ -5,7 +5,7 @@
 import { useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { TrainerShell, Feedback, ScenarioCard } from './TrainerShell'
+import { TrainerShell, Feedback, ScenarioCard, KindStatsPanel } from './TrainerShell'
 import { useStats } from '@/store/stats'
 import {
   MathQuestion,
@@ -64,6 +64,7 @@ function pickQuestion(): MathQuestion {
 
 export function MathTrainerView({ onBack }: { onBack: () => void }) {
   const record = useStats((s) => s.recordAnswer)
+  const kindStats = useStats((s) => s.kindStats)
   const [question, setQuestion] = useState<MathQuestion | null>(null)
   const [answer, setAnswer] = useState('')
   const [answeredCorrect, setAnsweredCorrect] = useState<boolean | null>(null)
@@ -80,7 +81,7 @@ export function MathTrainerView({ onBack }: { onBack: () => void }) {
     if (isNaN(val)) return
     const correct = checkMathAnswer(question, val)
     setAnsweredCorrect(correct)
-    record('math', correct)
+    record('math', correct, `math:${question.kind}`)
   }
 
   if (!question) {
@@ -102,6 +103,13 @@ export function MathTrainerView({ onBack }: { onBack: () => void }) {
             <li>Комбинации стартовых рук: пары 6, одномастные 4, разномастные 12</li>
             <li>SPR — соотношение эффективного стека к банку (±0.2)</li>
           </ul>
+          <KindStatsPanel
+            rows={(Object.keys(KIND_LABELS_RU) as MathKind[]).map((k) => ({
+              key: k,
+              label: KIND_LABELS_RU[k],
+              stat: kindStats[`math:${k}`],
+            }))}
+          />
           <Button onClick={next} className="bg-emerald-600 text-white hover:bg-emerald-500">
             Начать сессию
           </Button>
@@ -113,7 +121,7 @@ export function MathTrainerView({ onBack }: { onBack: () => void }) {
   return (
     <TrainerShell title="Математика покера" subtitle="Пот-оддсы, эквити, правило 2 и 4, MDF, SPR и блефы" trainerId="math" onBack={onBack}>
       <ScenarioCard>
-        <span className="inline-block w-fit text-[11px] uppercase tracking-wider text-emerald-300 border border-emerald-800/60 rounded px-2 py-0.5 bg-emerald-900/30">
+        <span className="inline-block w-fit text-[11px] uppercase tracking-wider text-emerald-300 border border-neutral-600/60 rounded px-2 py-0.5 bg-neutral-800/70">
           {KIND_LABELS_RU[question.kind]}
         </span>
         <p className="text-sm text-stone-100 font-medium">{question.prompt}</p>

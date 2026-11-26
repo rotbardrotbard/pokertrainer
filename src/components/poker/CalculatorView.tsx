@@ -320,7 +320,7 @@ export function CalculatorView({ onBack }: { onBack: () => void }) {
       {sim.result && (() => {
         const result = sim.result
         return (
-        <Card className="border-stone-800 bg-emerald-950/40">
+        <Card className="border-stone-800 bg-neutral-900/60">
           <CardContent className="p-4 sm:p-6 flex flex-col gap-4">
             <div className="flex items-baseline gap-3">
               <span className="text-4xl sm:text-5xl font-light text-emerald-400">
@@ -401,7 +401,7 @@ function SlotRow({
             onClick={() => (cards[id] ? onClear(id) : onSelect(id))}
             className={cn(
               'rounded-lg transition',
-              activeSlot === id && 'ring-2 ring-emerald-400 ring-offset-1 ring-offset-emerald-950',
+              activeSlot === id && 'ring-2 ring-emerald-400 ring-offset-1 ring-offset-neutral-900',
             )}
             aria-label={cards[id] ? 'Очистить слот' : 'Выбрать слот'}
           >

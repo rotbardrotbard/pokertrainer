@@ -135,7 +135,7 @@ function chartRangeChips(scenario: OmahaSimScenario): Array<{ text: string; acti
 function GtoChartPanel({ scenario, onOpenGto }: { scenario: OmahaSimScenario; onOpenGto?: (init: GtoInitial) => void }) {
   const chips = chartRangeChips(scenario)
   return (
-    <Card className="border-emerald-800/60 bg-emerald-950/40">
+    <Card className="border-stone-800 bg-neutral-900/60">
       <CardContent className="p-4 flex flex-col gap-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <h3 className="text-sm font-normal text-stone-100 flex items-center gap-2 min-w-0">
@@ -165,7 +165,7 @@ function GtoChartPanel({ scenario, onOpenGto }: { scenario: OmahaSimScenario; on
 /** Панель GTO-ориентира (постфлоп): тир руки и рекомендация. */
 function GtoPostflopPanel({ scenario, streetLabel, onOpenGto }: { scenario: OmahaSimScenario; streetLabel: string; onOpenGto?: (init: GtoInitial) => void }) {
   return (
-    <Card className="border-emerald-800/60 bg-emerald-950/40">
+    <Card className="border-stone-800 bg-neutral-900/60">
       <CardContent className="p-4 flex flex-col gap-2.5">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <h3 className="text-sm font-normal text-stone-100 flex items-center gap-2 min-w-0">
@@ -533,7 +533,7 @@ export function OmahaSimView({ variant, onBack, onOpenGto }: { variant: DoubleVa
             Начать сессию
           </Button>
 
-          <div className="rounded-lg border border-emerald-800/60 bg-emerald-950/40 p-4 flex flex-col gap-3">
+          <div className="rounded-lg border border-stone-800 bg-neutral-900/60 p-4 flex flex-col gap-3">
             <div className="flex items-center gap-2 text-sm text-stone-100">
               <GraduationCap className="w-4 h-4 text-emerald-400" />
               Режим экзамена

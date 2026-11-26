@@ -1,6 +1,6 @@
 'use client'
 
-// Покер Тренажёр — главный экран с переключением режимов
+// Suited — главный экран с переключением режимов
 import { useState, useEffect } from 'react'
 import { HomeView, ViewId } from '@/components/poker/HomeView'
 import { SimulatorView } from '@/components/poker/SimulatorView'
@@ -14,6 +14,7 @@ import { OmahaSimView } from '@/components/poker/OmahaSimView'
 import { RangesView } from '@/components/poker/RangesView'
 import { CalculatorView } from '@/components/poker/CalculatorView'
 import { GtoView } from '@/components/poker/GtoView'
+import { TheoryView } from '@/components/poker/TheoryView'
 import type { GtoInitial } from '@/components/poker/GtoView'
 
 export default function Home() {
@@ -62,6 +63,8 @@ export default function Home() {
       return <RangesView onBack={back} />
     case 'gto':
       return <GtoView onBack={back} initial={gtoInit} />
+    case 'theory':
+      return <TheoryView onBack={back} />
     case 'calculator':
       return <CalculatorView onBack={back} />
     default:

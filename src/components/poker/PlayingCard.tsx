@@ -25,12 +25,12 @@ export function PlayingCard({ card, faceDown, size = 'md', highlighted, dimmed, 
       <div
         className={cn(
           sizeClasses[size],
-          'border border-emerald-950/60 bg-gradient-to-br from-emerald-900 to-emerald-950 shadow-md flex items-center justify-center select-none',
+          'border border-neutral-600/60 bg-gradient-to-br from-neutral-700 to-neutral-800 shadow-md flex items-center justify-center select-none',
           className,
         )}
         aria-label="Закрытая карта"
       >
-        <span className="text-emerald-500/70 text-lg font-bold">♠</span>
+        <span className="text-neutral-400/80 text-lg font-bold">♠</span>
       </div>
     )
   }
@@ -41,7 +41,7 @@ export function PlayingCard({ card, faceDown, size = 'md', highlighted, dimmed, 
         sizeClasses[size],
         'bg-gradient-to-br from-stone-50 to-stone-200 border border-stone-300 shadow-md relative flex flex-col items-center justify-center select-none transition-transform',
         isRed ? 'text-red-600' : 'text-stone-900',
-        highlighted && 'ring-2 ring-emerald-400 ring-offset-1 ring-offset-emerald-950 scale-105 z-10',
+        highlighted && 'ring-2 ring-emerald-400 ring-offset-1 ring-offset-neutral-900 scale-105 z-10',
         dimmed && 'opacity-40',
         className,
       )}

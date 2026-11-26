@@ -80,19 +80,19 @@
 }
 
 .dark {
-  --background: #0a1a12;
+  --background: #15171b;
   --foreground: #e7e5e4;
-  --card: #0f2a1d;
+  --card: #1e2126;
   --card-foreground: #e7e5e4;
-  --popover: #0f2a1d;
+  --popover: #1e2126;
   --popover-foreground: #e7e5e4;
   --primary: #10b981;
   --primary-foreground: #ffffff;
-  --secondary: #16301f;
+  --secondary: #26292f;
   --secondary-foreground: #e7e5e4;
-  --muted: #16301f;
-  --muted-foreground: #a8a29e;
-  --accent: #16301f;
+  --muted: #26292f;
+  --muted-foreground: #a3a7ad;
+  --accent: #26292f;
   --accent-foreground: #e7e5e4;
   --destructive: #dc2626;
   --border: rgba(255, 255, 255, 0.08);
@@ -103,11 +103,11 @@
   --chart-3: #84cc16;
   --chart-4: #2dd4bf;
   --chart-5: #ef4444;
-  --sidebar: #0f2a1d;
+  --sidebar: #1e2126;
   --sidebar-foreground: #e7e5e4;
   --sidebar-primary: #10b981;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #16301f;
+  --sidebar-accent: #26292f;
   --sidebar-accent-foreground: #e7e5e4;
   --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-ring: #10b981;
@@ -120,8 +120,8 @@
   body {
     @apply bg-background text-foreground;
     background-image:
-      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(16, 185, 129, 0.09), transparent),
-      radial-gradient(ellipse 60% 40% at 50% 110%, rgba(45, 212, 191, 0.04), transparent);
+      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(154, 163, 175, 0.07), transparent),
+      radial-gradient(ellipse 60% 40% at 50% 110%, rgba(154, 163, 175, 0.03), transparent);
     background-attachment: fixed;
   }
   h1, h2 {
@@ -139,9 +139,9 @@
   background: rgba(0, 0, 0, 0.2);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(16, 185, 129, 0.35);
+  background: rgba(154, 163, 175, 0.35);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(16, 185, 129, 0.55);
+  background: rgba(154, 163, 175, 0.55);
 }

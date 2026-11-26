@@ -1,14 +1,14 @@
 'use client'
 
 // Главная: режимы тренировки, статистика, серия дней
-import { Flame, Zap, Sigma, Target, Percent, Swords, Layers, Grid3x3, Calculator, Trophy, ShieldCheck, Spade, Copy, SquareStack, Shuffle, Dices, Compass } from 'lucide-react'
+import { Flame, Zap, Sigma, Target, Percent, Swords, Layers, Grid3x3, Calculator, Trophy, ShieldCheck, Spade, Copy, SquareStack, Shuffle, Dices, Compass, BookOpen } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { TrainerId, useStats, accuracy } from '@/store/stats'
 import { PlayingCard, CardRow } from './PlayingCard'
 import { parseCard } from '@/lib/poker/cards'
 import { cn } from '@/lib/utils'
 
-export type ViewId = TrainerId | 'ranges' | 'calculator' | 'gto' | 'home'
+export type ViewId = TrainerId | 'ranges' | 'calculator' | 'gto' | 'theory' | 'home'
 
 interface ModeCard {
   id: ViewId
@@ -32,7 +32,8 @@ const MODES: ModeCard[] = [
   { id: 'omaha5sim', title: 'Симулятор · 5-card Омаха (2 доски)', desc: 'Диапазоны позиции и эквити двух досок с переходом в GTO', icon: Dices, trainer: 'omaha5sim' },
   { id: 'ranges', title: 'Диапазоны префлоп', desc: 'Чарты 6-max по позициям', icon: Grid3x3 },
   { id: 'gto', title: 'GTO-чарты', desc: 'Стол, позиция, соперники и раунд: что играть, что сбрасывать', icon: Compass },
-  { id: 'calculator', title: 'Калькулятор эквити', desc: 'Холдем и Омаха: до 8 оппонентов и выбор диапазонов', icon: Calculator },
+  { id: 'theory', title: 'Теория покера', desc: 'Аутсы, правило 2 и 4, пот-оддсы, EV, MDF и SPR — справочник с примерами', icon: BookOpen },
+  { id: 'calculator', title: 'Калькулятор эквити', desc: 'Холдем и Омаха 4/5 карт: до 8 оппонентов и выбор диапазонов', icon: Calculator },
 ]
 
 export function HomeView({ onSelect }: { onSelect: (v: ViewId) => void }) {
@@ -56,8 +57,8 @@ export function HomeView({ onSelect }: { onSelect: (v: ViewId) => void }) {
           <span className="text-stone-500 text-lg font-normal">vs</span>
           <CardRow cards={demoBoard} size="sm" className="opacity-80" />
         </div>
-        <h1 className="text-3xl sm:text-4xl font-light text-stone-50 tracking-tight">
-          Покер Тренажёр
+        <h1 className="text-4xl sm:text-5xl font-light text-stone-50 tracking-tight">
+          Suited
         </h1>
         <p className="text-sm text-stone-400 max-w-md">
           Бесплатная тренировка покерных навыков: Texas Hold&apos;em и Омаха — решения, математика,
@@ -83,13 +84,13 @@ export function HomeView({ onSelect }: { onSelect: (v: ViewId) => void }) {
           const acc = m.trainer ? accuracy(stats[m.trainer].correct, stats[m.trainer].attempts) : null
           return (
             <button key={m.id} type="button" onClick={() => onSelect(m.id)} className="text-left">
-              <Card className="border-stone-800 bg-gradient-to-br from-emerald-900/50 to-emerald-950/70 hover:from-emerald-800/60 hover:to-emerald-900/80 transition-all hover:border-emerald-500/40 h-full">
+              <Card className="border-stone-800 bg-gradient-to-br from-neutral-800/70 to-neutral-900/85 hover:from-neutral-700/75 hover:to-neutral-800/95 transition-all hover:border-emerald-500/40 h-full">
                 <CardContent className="p-4 flex items-start gap-3">
                   <div className="mt-0.5 w-10 h-10 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0">
                     <Icon className="w-5 h-5 text-emerald-400" />
                   </div>
                   <div className="min-w-0">
-                    <h2 className="font-normal text-stone-100 text-sm sm:text-base">{m.title}</h2>
+                    <h2 className="font-normal text-stone-100 text-base sm:text-lg">{m.title}</h2>
                     <p className="text-xs text-stone-400 mt-0.5">{m.desc}</p>
                     {acc !== null && (
                       <p className={cn('text-xs mt-1.5 font-normal', acc >= 70 ? 'text-emerald-400' : 'text-stone-400')}>
@@ -107,7 +108,7 @@ export function HomeView({ onSelect }: { onSelect: (v: ViewId) => void }) {
       {/* Информация */}
       <Card className="border-stone-800 bg-stone-900/50">
         <CardContent className="p-4 flex flex-col gap-2">
-          <h2 className="text-sm font-normal text-stone-200 flex items-center gap-2">
+          <h2 className="text-base font-normal text-stone-200 flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-500" />
             Полностью бесплатно
           </h2>
