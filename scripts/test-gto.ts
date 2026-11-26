@@ -6,7 +6,7 @@ import {
   omahaPreflop, omahaAction, postflopPlan, preflopNotes, multiwayNote,
   analyzeBoardTexture,
 } from '../src/lib/poker/gto'
-import { openPercentFor, vsRaiseCharts } from '../src/lib/poker/ranges'
+import { openPercentFor, vsRaiseCharts, validRaisersFor } from '../src/lib/poker/ranges'
 
 let failures = 0
 function assert(cond: boolean, msg: string) {
@@ -87,6 +87,23 @@ const sizeOf = (note: string) => Number(/(\d+)%/.exec(note)?.[1] ?? 0)
   // UTG против UTG1 (9-max)
   const utgVs = holdemPreflop('UTG', 9, 'vsraise', 0, 'UTG')
   assert(holdemAction('AA', utgVs) === 'raise' && holdemAction('72o', utgVs) === 'fold', 'UTG против UTG1: AA — 3бет, мусор — фолд')
+  // Регрессия ATs: сильные руки не должны фолдить против рейза ни в одном сочетании защитник × рейзер
+  const strongHands = ['AQs', 'AJs', 'ATs', 'JJ', 'TT', '99', '88']
+  for (const def of ['UTG', 'MP', 'CO', 'BTN', 'SB', 'BB'] as const) {
+    for (const raiser of validRaisersFor(def)) {
+      const chart = holdemPreflop(def, 6, 'vsraise', 0, raiser)
+      if (!chart.call.size && !chart.raise.size) continue
+      for (const cls of strongHands) {
+        assert(holdemAction(cls, chart) !== 'fold', `${cls} не фолдит: ${def} против ${raiser}`)
+      }
+    }
+  }
+  assert(holdemAction('ATs', vsUTG) === 'call', 'ATs против UTG — колл')
+  assert(holdemAction('ATs', vsBTN) === 'call', 'ATs против BTN — колл')
+  assert(holdemAction('ATs', holdemPreflop('BB', 2, 'vsraise', 0, 'BTN')) === 'call', 'ATs на HU против BTN — колл')
+  assert(holdemAction('AJs', vsUTG) === 'call', 'AJs против UTG — колл')
+  assert(holdemAction('AQs', vsBTN) === 'raise', 'AQs против BTN — 3бет')
+  assert(holdemAction('AQs', vsUTG) === 'call', 'AQs против UTG — колл')
 }
 
 // 5. Омаха: размеры стола и позиционность защиты
