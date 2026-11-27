@@ -28,22 +28,24 @@ export function TrainerShell({ title, subtitle, trainerId, onBack, children }: T
         <Button variant="ghost" size="sm" onClick={onBack} className="text-stone-300 hover:text-white hover:bg-stone-800/60">
           <ArrowLeft className="w-4 h-4" /> Меню
         </Button>
-        <div className="flex items-center gap-3 text-xs">
-          <span className="flex items-center gap-1 text-emerald-400">
-            <Target className="w-3.5 h-3.5" />
-            Сессия: {session === null ? '—' : `${session}%`}
-          </span>
-          <span className="flex items-center gap-1 text-stone-400">
-            <Flame className="w-3.5 h-3.5" />
-            Всего: {lifetime === null ? '—' : `${lifetime}%`} ({stats ? stats.attempts : 0})
-          </span>
-          {stats !== null && stats.hints > 0 && (
-            <span className="flex items-center gap-1 text-stone-400">
-              <Lightbulb className="w-3.5 h-3.5" />
-              Подсказки: {stats.hints}
+        {stats !== null && (
+          <div className="flex items-center gap-3 text-xs">
+            <span className="flex items-center gap-1 text-emerald-400">
+              <Target className="w-3.5 h-3.5" />
+              Сессия: {session === null ? '—' : `${session}%`}
             </span>
-          )}
-        </div>
+            <span className="flex items-center gap-1 text-stone-400">
+              <Flame className="w-3.5 h-3.5" />
+              Всего: {lifetime === null ? '—' : `${lifetime}%`} ({stats ? stats.attempts : 0})
+            </span>
+            {stats !== null && stats.hints > 0 && (
+              <span className="flex items-center gap-1 text-stone-400">
+                <Lightbulb className="w-3.5 h-3.5" />
+                Подсказки: {stats.hints}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       <div>

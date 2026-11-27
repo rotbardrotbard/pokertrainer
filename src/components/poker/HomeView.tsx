@@ -1,7 +1,7 @@
 'use client'
 
 // Главная: режимы тренировки, статистика, серия дней
-import { Flame, Zap, Sigma, Target, Percent, Swords, Layers, Grid3x3, Calculator, Trophy, ShieldCheck, Spade, Copy, SquareStack, Shuffle, Dices, Compass, BookOpen, RotateCcw } from 'lucide-react'
+import { Flame, Zap, Sigma, Target, Percent, Swords, Layers, Grid3x3, Calculator, Trophy, ShieldCheck, Spade, Copy, SquareStack, Shuffle, Dices, Compass, BookOpen, RotateCcw, CalendarDays } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { TrainerId, useStats, accuracy } from '@/store/stats'
@@ -9,7 +9,7 @@ import { PlayingCard, CardRow } from './PlayingCard'
 import { parseCard } from '@/lib/poker/cards'
 import { cn } from '@/lib/utils'
 
-export type ViewId = TrainerId | 'ranges' | 'calculator' | 'gto' | 'theory' | 'home'
+export type ViewId = TrainerId | 'ranges' | 'calculator' | 'gto' | 'theory' | 'calendar' | 'home'
 
 interface ModeCard {
   id: ViewId
@@ -35,6 +35,7 @@ const MODES: ModeCard[] = [
   { id: 'gto', title: 'GTO-чарты', desc: 'Стол, позиция, соперники и раунд: что играть, что сбрасывать', icon: Compass },
   { id: 'theory', title: 'Теория покера', desc: 'Аутсы, правило 2 и 4, пот-оддсы, EV, MDF и SPR — справочник с примерами', icon: BookOpen },
   { id: 'calculator', title: 'Калькулятор эквити', desc: 'Холдем и Омаха 4/5 карт: до 8 оппонентов и выбор диапазонов', icon: Calculator },
+  { id: 'calendar', title: 'Календарь занятий', desc: 'Статистика прохождения упражнений по дням: активность, точность, серии', icon: CalendarDays },
 ]
 
 export function HomeView({ onSelect }: { onSelect: (v: ViewId) => void }) {

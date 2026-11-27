@@ -14,6 +14,28 @@ export interface TrainerStats {
   sessionCorrect: number
 }
 
+/** Ответы одного режима за день (для календаря занятий) */
+export interface DayTrainerStat {
+  attempts: number
+  correct: number
+}
+
+/** Экзамен, завершённый в этот день */
+export interface DayExamResult {
+  trainer: TrainerId
+  pct: number
+}
+
+/** Всё, что произошло в тренировках за конкретный день (ключ 'YYYY-MM-DD') */
+export interface DayEntry {
+  t: Partial<Record<TrainerId, DayTrainerStat>>
+  exams: DayExamResult[]
+}
+
+export function emptyDayEntry(): DayEntry {
+  return { t: {}, exams: [] }
+}
+
 function emptyT(): TrainerStats {
   return { attempts: 0, correct: 0, hints: 0, exams: 0, examBest: 0, sessionAttempts: 0, sessionCorrect: 0 }
 }
@@ -22,6 +44,8 @@ interface StatsState {
   stats: Record<TrainerId, TrainerStats>
   /** статистика по типам задач: ключ 'math:potOdds', 'outs:Флеш-дро' и т.п. */
   kindStats: Record<string, { attempts: number; correct: number }>
+  /** дневной журнал: ключ 'YYYY-MM-DD' → ответы по режимам и экзамены этого дня */
+  dayLog: Record<string, DayEntry>
   streak: number
   bestStreak: number
   lastPlayedDate: string | null
@@ -55,6 +79,7 @@ export const useStats = create<StatsState>()(
     (set, get) => ({
       stats: emptyStats(),
       kindStats: {},
+      dayLog: {},
       streak: 0,
       bestStreak: 0,
       lastPlayedDate: null,
@@ -70,6 +95,9 @@ export const useStats = create<StatsState>()(
           streak = diff === 1 ? s.streak + 1 : 1
           bestStreak = Math.max(bestStreak, streak)
         }
+        // дневной журнал для календаря занятий
+        const day = s.dayLog?.[today] ?? emptyDayEntry()
+        const dt = day.t[trainer] ?? { attempts: 0, correct: 0 }
         set({
           stats: {
             ...s.stats,
@@ -79,6 +107,19 @@ export const useStats = create<StatsState>()(
               correct: t.correct + (correct ? 1 : 0),
               sessionAttempts: t.sessionAttempts + 1,
               sessionCorrect: t.sessionCorrect + (correct ? 1 : 0),
+            },
+          },
+          dayLog: {
+            ...s.dayLog,
+            [today]: {
+              ...day,
+              t: {
+                ...day.t,
+                [trainer]: {
+                  attempts: dt.attempts + 1,
+                  correct: dt.correct + (correct ? 1 : 0),
+                },
+              },
             },
           },
           streak,
@@ -110,6 +151,9 @@ export const useStats = create<StatsState>()(
         const s = get()
         const t = s.stats[trainer] ?? emptyT()
         const pct = total > 0 ? Math.round((correct / total) * 100) : 0
+        // результат экзамена попадает и в дневной журнал
+        const today = todayStr()
+        const day = s.dayLog?.[today] ?? emptyDayEntry()
         set({
           stats: {
             ...s.stats,
@@ -118,6 +162,10 @@ export const useStats = create<StatsState>()(
               exams: (t.exams ?? 0) + 1,
               examBest: Math.max(t.examBest ?? 0, pct),
             },
+          },
+          dayLog: {
+            ...s.dayLog,
+            [today]: { ...day, exams: [...day.exams, { trainer, pct }].slice(-20) },
           },
         })
       },
@@ -128,7 +176,7 @@ export const useStats = create<StatsState>()(
           stats: { ...s.stats, [trainer]: { ...t, sessionAttempts: 0, sessionCorrect: 0 } },
         })
       },
-      resetAll: () => set({ stats: emptyStats(), kindStats: {}, streak: 0, lastPlayedDate: null }),
+      resetAll: () => set({ stats: emptyStats(), kindStats: {}, dayLog: {}, streak: 0, lastPlayedDate: null }),
     }),
     {
       name: 'poker-trainer-stats',
@@ -139,7 +187,7 @@ export const useStats = create<StatsState>()(
         for (const k of Object.keys(merged) as TrainerId[]) {
           merged[k] = { ...merged[k], ...(p.stats?.[k] ?? {}) }
         }
-        return { ...current, ...p, stats: merged, kindStats: p.kindStats ?? {} }
+        return { ...current, ...p, stats: merged, kindStats: p.kindStats ?? {}, dayLog: p.dayLog ?? {} }
       },
     },
   ),

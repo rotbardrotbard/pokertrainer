@@ -34,6 +34,23 @@ s.recordAnswer('ev', true)
 ks = useStats.getState().kindStats
 assert(!ks['ev'], 'ответ без типа не создаёт запись в kindStats')
 
+// дневной журнал: каждый ответ попадает в день, суммы сходятся
+const dl = useStats.getState().dayLog
+const today = Object.keys(dl)[0]
+assert(Object.keys(dl).length === 1, 'все ответы попали в один день (сегодня)')
+assert(dl[today].t.math.attempts === 3 && dl[today].t.math.correct === 1, 'дневная запись math → 3/1')
+assert(dl[today].t.outs.attempts === 1 && dl[today].t.outs.correct === 1, 'дневная запись outs → 1/1')
+assert(dl[today].t.ev.attempts === 1 && dl[today].t.ev.correct === 1, 'дневная запись ev → 1/1')
+
+// экзамен попадает в дневной журнал с процентом
+s.recordExam('omaha4sim', 7, 10)
+const dl2 = useStats.getState().dayLog[today]
+assert(dl2.exams.length === 1 && dl2.exams[0].trainer === 'omaha4sim' && dl2.exams[0].pct === 70, 'экзамен в журнале дня: omaha4sim 70%')
+
+// сброс снова чистит дневник
+useStats.getState().resetAll()
+assert(Object.keys(useStats.getState().dayLog).length === 0, 'resetAll очищает dayLog')
+
 // resetAll снова всё чистит
 useStats.getState().resetAll()
 ks = useStats.getState().kindStats
