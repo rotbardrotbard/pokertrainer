@@ -17,6 +17,7 @@ import { GtoView } from '@/components/poker/GtoView'
 import { TheoryView } from '@/components/poker/TheoryView'
 import { CalendarView } from '@/components/poker/CalendarView'
 import { AchievementsView } from '@/components/poker/AchievementsView'
+import { LiveGameView } from '@/components/poker/LiveGameView'
 import type { GtoInitial } from '@/components/poker/GtoView'
 
 export default function Home() {
@@ -61,6 +62,8 @@ export default function Home() {
       return <OmahaSimView variant="double4" onBack={back} onOpenGto={openGto} />
     case 'omaha5sim':
       return <OmahaSimView variant="double5" onBack={back} onOpenGto={openGto} />
+    case 'live':
+      return <LiveGameView onBack={back} />
     case 'ranges':
       return <RangesView onBack={back} />
     case 'gto':
