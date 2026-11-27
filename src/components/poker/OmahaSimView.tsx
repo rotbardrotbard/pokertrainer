@@ -38,12 +38,12 @@ const TRAINER_BY_VARIANT: Record<DoubleVariant, 'omaha4sim' | 'omaha5sim'> = {
 
 const META: Record<DoubleVariant, { title: string; subtitle: string; badge: string }> = {
   double4: {
-    title: 'Симулятор раздач · 4-card Омаха',
+    title: 'Симулятор 4-card Омаха (2 доски)',
     subtitle: 'Двойной борд: фолд, колл или рейз — как за реальным столом',
     badge: '4 карты руки · 2 доски',
   },
   double5: {
-    title: 'Симулятор раздач · 5-card Омаха',
+    title: 'Симулятор 5-card Омаха (2 доски)',
     subtitle: 'Пять карт руки на двух досках: решения с разбором эквити',
     badge: '5 карт руки · 2 доски',
   },

@@ -512,9 +512,12 @@ export class LiveHand {
     // если действовать может максимум один игрок — ранаут без действий
     const actors = this.seats.filter((p) => this.canAct(p))
     if (actors.length <= 1) {
-      while (this.street !== 'river') {
+      // локальная переменная: TS не отслеживает изменение this.street внутри dealNextStreet()
+      let st = this.street as Street
+      while (st !== 'river') {
         this.bankBets()
         this.dealNextStreet()
+        st = this.street
       }
       this.showdown()
       return
@@ -725,7 +728,8 @@ export class LiveHand {
     const opts = this.heroOptions()
     if (!opts) return
     const p = this.hero()
-    const best = this.street === 'preflop' ? this.heroPreflopGrade(p) : this.heroPostflopGrade(p)
+    const best: { kind: LiveActionKind; reason: string; eq?: number; required?: number } =
+      this.street === 'preflop' ? this.heroPreflopGrade(p) : this.heroPostflopGrade(p)
     this.heroTurns++
     const chosenKind: LiveActionKind = kind === 'raise' ? (this.currentBet > 0 ? 'raise' : 'bet') : kind
     const chosenText = chosenKind === 'raise' || chosenKind === 'bet'
@@ -739,8 +743,8 @@ export class LiveHand {
       best: bestText,
       correct: chosenKind === best.kind,
       reason: best.reason,
-      eqPct: 'eq' in best ? Math.round(best.eq * 1000) / 10 : undefined,
-      requiredPct: 'required' in best ? Math.round(best.required * 1000) / 10 : undefined,
+      eqPct: best.eq !== undefined ? Math.round(best.eq * 1000) / 10 : undefined,
+      requiredPct: best.required !== undefined ? Math.round(best.required * 1000) / 10 : undefined,
     })
     this.lastVerdict = { correct: chosenKind === best.kind, reason: best.reason }
     this.awaitingHeroFlag = false

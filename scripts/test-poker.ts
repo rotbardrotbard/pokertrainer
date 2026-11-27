@@ -1,5 +1,6 @@
 // Тесты покерного движка: evaluator, equity, outs, ranges
 import { fullDeck, shuffle, parseCard, cardToString } from '../src/lib/poker/cards'
+import type { Card } from '../src/lib/poker/cards'
 import { evaluate7, evaluate7BruteForce, evaluate5, handName, scoreCategory } from '../src/lib/poker/evaluator'
 import { simulateEquity, countOuts } from '../src/lib/poker/equity'
 import {
@@ -31,7 +32,7 @@ function assert(cond: boolean, msg: string) {
 
 // ---------- 2. Оценщик: известные руки ----------
 function evalScore(strs: string[]): number {
-  return evaluate7(strs.map(parseCard!)).score
+  return evaluate7(strs.map((x) => parseCard(x) as Card)).score
 }
 {
   // Роял-флеш
@@ -116,21 +117,21 @@ function evalScore(strs: string[]): number {
 
 // ---------- 5. Названия рук на русском ----------
 {
-  const n1 = handName(evaluate7(['As', 'Ah', 'Ad', 'Ac', 'Ks', '2h', '3d'].map(parseCard!)))
+  const n1 = handName(evaluate7(['As', 'Ah', 'Ad', 'Ac', 'Ks', '2h', '3d'].map((x) => parseCard(x) as Card)))
   assert(n1 === 'Каре тузов', `handName quads: ${n1}`)
-  const n2 = handName(evaluate7(['As', 'Ah', 'Ad', 'Ks', 'Kh', '2h', '3d'].map(parseCard!)))
+  const n2 = handName(evaluate7(['As', 'Ah', 'Ad', 'Ks', 'Kh', '2h', '3d'].map((x) => parseCard(x) as Card)))
   assert(n2 === 'Фулл-хаус: тузов и королей', `handName full house: ${n2}`)
-  const n3 = handName(evaluate7(['As', 'Ah', 'Kd', 'Kh', 'Qs', '2h', '3d'].map(parseCard!)))
+  const n3 = handName(evaluate7(['As', 'Ah', 'Kd', 'Kh', 'Qs', '2h', '3d'].map((x) => parseCard(x) as Card)))
   assert(n3 === 'Две пары: тузов и королей', `handName two pair: ${n3}`)
-  const n4 = handName(evaluate7(['As', 'Kh', 'Qs', 'Jd', 'Ts', '2h', '3d'].map(parseCard!)))
+  const n4 = handName(evaluate7(['As', 'Kh', 'Qs', 'Jd', 'Ts', '2h', '3d'].map((x) => parseCard(x) as Card)))
   assert(n4 === 'Стрит до туза (Бродвей)', `handName broadway: ${n4}`)
-  const n5 = handName(evaluate7(['As', '2h', '3s', '4d', '5s', 'Kh', 'Kd'].map(parseCard!)))
+  const n5 = handName(evaluate7(['As', '2h', '3s', '4d', '5s', 'Kh', 'Kd'].map((x) => parseCard(x) as Card)))
   assert(n5 === 'Колесо (5-4-3-2-A)', `handName wheel: ${n5}`)
-  const n6 = handName(evaluate7(['Ks', 'Qh', 'Js', '9d', 'Th', '2h', '3d'].map(parseCard!)))
+  const n6 = handName(evaluate7(['Ks', 'Qh', 'Js', '9d', 'Th', '2h', '3d'].map((x) => parseCard(x) as Card)))
   assert(n6 === 'Стрит до короля', `handName K-straight: ${n6}`)
-  const n7 = handName(evaluate7(['9s', 'Ts', 'Js', 'Qs', 'Ks', '2h', '3d'].map(parseCard!)))
+  const n7 = handName(evaluate7(['9s', 'Ts', 'Js', 'Qs', 'Ks', '2h', '3d'].map((x) => parseCard(x) as Card)))
   assert(n7 === 'Стрит-флеш до короля', `handName SF: ${n7}`)
-  const n8 = handName(evaluate7(['As', 'Ks', 'Qs', 'Js', 'Ts', '2h', '3d'].map(parseCard!)))
+  const n8 = handName(evaluate7(['As', 'Ks', 'Qs', 'Js', 'Ts', '2h', '3d'].map((x) => parseCard(x) as Card)))
   assert(n8 === 'Флеш-рояль', `handName royal: ${n8}`)
 }
 
@@ -237,11 +238,11 @@ function evalScore(strs: string[]): number {
 {
   for (let i = 0; i < 200; i++) {
     const q = genMathQuestion()
-    assert(q.requiredPct > 0 && q.requiredPct < 100, 'math required in (0,100)')
-    // проверка формулы: колл при точно requiredPct — правильный ответ
-    assert(checkMathAnswer(q, q.requiredPct), 'own answer passes')
+    assert(q.answer > 0 && q.answer < 100, 'math required in (0,100)')
+    // проверка формулы: колл при точно answer — правильный ответ
+    assert(checkMathAnswer(q, q.answer), 'own answer passes')
     const q2 = genRatioQuestion()
-    assert(q2.requiredPct > 0 && q2.requiredPct <= 67, 'ratio answer range')
+    assert(q2.answer > 0 && q2.answer <= 67, 'ratio answer range')
   }
   console.log('math questions OK')
 
@@ -249,7 +250,8 @@ function evalScore(strs: string[]): number {
   const seenCounts = new Set<number>()
   for (let i = 0; i < 60; i++) {
     const q = genOutsQuestion()
-    assert([9, 8, 4].includes(q.outsCount), `classic outs count 9/8/4: got ${q.outsCount}`)
+    // 13 сценариев тренажёра: от гатшота (3-4) до флеш-дро с доп. аутсами (12-15)
+    assert(q.outsCount >= 2 && q.outsCount <= 15, `outs count in [2,15]: got ${q.outsCount}`)
     assert(q.hero.length === 2 && q.villain.length === 2, 'outs deal sizes')
     assert(!q.heroAheadNow, 'hero behind in outs scenario')
     seenCounts.add(q.outsCount)

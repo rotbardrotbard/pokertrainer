@@ -11,6 +11,8 @@ import { WinnerTrainerView } from '@/components/poker/WinnerTrainerView'
 import { ComboTrainerView } from '@/components/poker/ComboTrainerView'
 import { OmahaTrainerView } from '@/components/poker/OmahaTrainerView'
 import { OmahaSimView } from '@/components/poker/OmahaSimView'
+import { OmahaSimViewClassic } from '@/components/poker/OmahaSimViewClassic'
+import { DonateView } from '@/components/poker/DonateView'
 import { RangesView } from '@/components/poker/RangesView'
 import { CalculatorView } from '@/components/poker/CalculatorView'
 import { GtoView } from '@/components/poker/GtoView'
@@ -42,6 +44,8 @@ export default function Home() {
   switch (view) {
     case 'sim':
       return <SimulatorView onBack={back} />
+    case 'omahaSim':
+      return <OmahaSimViewClassic onBack={back} onOpenGto={openGto} />
     case 'math':
       return <MathTrainerView onBack={back} />
     case 'outs':
@@ -76,6 +80,8 @@ export default function Home() {
       return <CalendarView onBack={back} />
     case 'achievements':
       return <AchievementsView onBack={back} />
+    case 'donate':
+      return <DonateView onBack={back} />
     default:
       return <HomeView onSelect={setView} />
   }

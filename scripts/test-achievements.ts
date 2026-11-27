@@ -1,5 +1,5 @@
 // Тест XP-модели, уровней и бейджей (store/stats.ts + lib/achievements.ts)
-import { useStats, levelFor, LEVELS, dayEntryTotals, XP_PER_CORRECT, STREAK_DAY_XP, DAILY_GOAL_XP, EXAM_PASS_XP, EXAM_GREAT_XP } from '../src/store/stats'
+import { TRAINER_IDS, useStats, levelFor, LEVELS, dayEntryTotals, XP_PER_CORRECT, STREAK_DAY_XP, DAILY_GOAL_XP, EXAM_PASS_XP, EXAM_GREAT_XP } from '../src/store/stats'
 import { evaluateBadges } from '../src/lib/achievements'
 
 function assert(cond: boolean, msg: string) {
@@ -94,8 +94,8 @@ assert(byId('examGreat').earned, 'бейдж «Отличник» открыт (
 assert(byId('allModes').earned === false, 'бейдж «Все дисциплины» закрыт (не все режимы)')
 assert(byId('calendarVeteran').earned === false, 'бейдж «Ветеран календаря» закрыт (< 30 дней)')
 
-// все 11 режимов → «Все дисциплины»
-for (const id of ['sim', 'math', 'outs', 'ev', 'winner', 'combo', 'omaha', 'omaha4', 'omaha5', 'omaha4sim', 'omaha5sim'] as const) {
+// все режимы → «Все дисциплины»
+for (const id of TRAINER_IDS) {
   s.recordAnswer(id, true)
 }
 st = useStats.getState()

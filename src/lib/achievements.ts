@@ -52,10 +52,18 @@ export const BADGES: BadgeDef[] = [
   { id: 'marathon', title: 'Марафонец', desc: 'Серия занятий 30 дней без пропуска', earned: (s) => s.bestStreak >= 30 },
   { id: 'firstExam', title: 'Аттестат', desc: 'Первый сданный экзамен', earned: (s) => examsTaken(s) >= 1 },
   { id: 'examGreat', title: 'Отличник', desc: 'Экзамен на 90% и выше', earned: (s) => bestExam(s) >= 90 },
-  { id: 'allModes', title: 'Все дисциплины', desc: 'Верный ответ в каждом из 11 режимов', earned: (s) => modesCovered(s) >= TRAINER_IDS.length },
+  { id: 'allModes', title: 'Все дисциплины', desc: 'Верный ответ в каждом режиме тренировок', earned: (s) => modesCovered(s) >= TRAINER_IDS.length },
   { id: 'calendarVeteran', title: 'Ветеран календаря', desc: '30 дней с занятиями за всё время', earned: (s) => activeDays(s) >= 30 },
 ]
 
-export function evaluateBadges(s: StatsSnapshot): Array<BadgeDef & { earned: boolean }> {
-  return BADGES.map((b) => ({ ...b, earned: b.earned(s) }))
+/** Бейдж с вычисленным статусом получения */
+export interface EarnedBadge {
+  id: string
+  title: string
+  desc: string
+  earned: boolean
+}
+
+export function evaluateBadges(s: StatsSnapshot): EarnedBadge[] {
+  return BADGES.map(({ earned, ...rest }) => ({ ...rest, earned: earned(s) }))
 }

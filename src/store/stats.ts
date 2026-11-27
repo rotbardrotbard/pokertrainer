@@ -2,9 +2,9 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export type TrainerId = 'sim' | 'math' | 'outs' | 'ev' | 'winner' | 'combo' | 'omaha' | 'omaha4' | 'omaha5' | 'omaha4sim' | 'omaha5sim'
+export type TrainerId = 'sim' | 'omahaSim' | 'math' | 'outs' | 'ev' | 'winner' | 'combo' | 'omaha' | 'omaha4' | 'omaha5' | 'omaha4sim' | 'omaha5sim'
 
-export const TRAINER_IDS: TrainerId[] = ['sim', 'math', 'outs', 'ev', 'winner', 'combo', 'omaha', 'omaha4', 'omaha5', 'omaha4sim', 'omaha5sim']
+export const TRAINER_IDS: TrainerId[] = ['sim', 'omahaSim', 'math', 'outs', 'ev', 'winner', 'combo', 'omaha', 'omaha4', 'omaha5', 'omaha4sim', 'omaha5sim']
 
 // ===== Модель XP (уровни достижений) =====
 // XP строится на трёх факторах: верные ответы, серия дней без пропуска,

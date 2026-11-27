@@ -162,7 +162,7 @@ console.log('=== 7. Статистика грейдинга героя (сани
   let total = 0
   let correct = 0
   for (let k = 0; k < 40; k++) {
-    const game: LiveGame = ['holdem', 'omaha4'][k % 2]
+    const game: LiveGame = k % 2 === 0 ? 'holdem' : 'omaha4'
     const hand = new LiveHand({ game, bots: 2, mode: 'full' })
     let guard = 0
     while (!hand.snapshot().finished && guard++ < 1500) {

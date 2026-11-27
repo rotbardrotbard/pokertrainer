@@ -31,7 +31,7 @@ export function SimulatorView({ onBack }: { onBack: () => void }) {
   // стартовый сценарий создаётся при первом рендере
   if (!scenario) {
     return (
-      <TrainerShell title="Симулятор раздач" subtitle="Принимайте решения, как за реальным столом" trainerId="sim" onBack={onBack}>
+      <TrainerShell title="Симулятор Holdem" subtitle="Принимайте решения, как за реальным столом" trainerId="sim" onBack={onBack}>
         <ScenarioCard>
           <p className="text-sm text-stone-300">
             Тренируйте решения на префлопе и постфлопе: открытие рейза, защита против рейза, коллы по пот-оддсам.
@@ -49,7 +49,7 @@ export function SimulatorView({ onBack }: { onBack: () => void }) {
   const boardShown = scenario.kind === 'postflop' ? scenario.board ?? [] : null
 
   return (
-    <TrainerShell title="Симулятор раздач" subtitle="Принимайте решения, как за реальным столом" trainerId="sim" onBack={onBack}>
+    <TrainerShell title="Симулятор Holdem" subtitle="Принимайте решения, как за реальным столом" trainerId="sim" onBack={onBack}>
       <ScenarioCard>
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <Badge variant="outline" className="border-emerald-500/50 text-emerald-400">

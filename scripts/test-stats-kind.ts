@@ -36,11 +36,12 @@ assert(!ks['ev'], 'ответ без типа не создаёт запись �
 
 // дневной журнал: каждый ответ попадает в день, суммы сходятся
 const dl = useStats.getState().dayLog
-const today = Object.keys(dl)[0]
+const today = Object.keys(dl)[0]!
+const d0 = dl[today]!
 assert(Object.keys(dl).length === 1, 'все ответы попали в один день (сегодня)')
-assert(dl[today].t.math.attempts === 3 && dl[today].t.math.correct === 1, 'дневная запись math → 3/1')
-assert(dl[today].t.outs.attempts === 1 && dl[today].t.outs.correct === 1, 'дневная запись outs → 1/1')
-assert(dl[today].t.ev.attempts === 1 && dl[today].t.ev.correct === 1, 'дневная запись ev → 1/1')
+assert(d0.t.math!.attempts === 3 && d0.t.math!.correct === 1, 'дневная запись math → 3/1')
+assert(d0.t.outs!.attempts === 1 && d0.t.outs!.correct === 1, 'дневная запись outs → 1/1')
+assert(d0.t.ev!.attempts === 1 && d0.t.ev!.correct === 1, 'дневная запись ev → 1/1')
 
 // экзамен попадает в дневной журнал с процентом
 s.recordExam('omaha4sim', 7, 10)

@@ -26,7 +26,7 @@ export function WinnerTrainerView({ onBack }: { onBack: () => void }) {
 
   if (!question) {
     return (
-      <TrainerShell title="Кто победил?" subtitle="Определяйте выигрышную комбинацию по 5 лучшим картам" trainerId="winner" onBack={onBack}>
+      <TrainerShell title="Кто победил? Holdem" subtitle="Определяйте выигрышную комбинацию по 5 лучшим картам" trainerId="winner" onBack={onBack}>
         <ScenarioCard>
           <p className="text-sm text-stone-300">
             Классическая задача новичка: из 7 карт берутся лучшие 5, и сравниваются две руки.
@@ -48,7 +48,7 @@ export function WinnerTrainerView({ onBack }: { onBack: () => void }) {
   const correct = answered === question.correct
 
   return (
-    <TrainerShell title="Кто победил?" subtitle="Определяйте выигрышную комбинацию по 5 лучшим картам" trainerId="winner" onBack={onBack}>
+    <TrainerShell title="Кто победил? Holdem" subtitle="Определяйте выигрышную комбинацию по 5 лучшим картам" trainerId="winner" onBack={onBack}>
       <ScenarioCard>
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-3">

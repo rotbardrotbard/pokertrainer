@@ -1,7 +1,7 @@
 'use client'
 
 // Главная: режимы тренировки, статистика, серия дней
-import { Flame, Zap, Sigma, Target, Percent, Swords, Layers, Grid3x3, Calculator, Trophy, ShieldCheck, Spade, Copy, SquareStack, Shuffle, Dices, Compass, BookOpen, RotateCcw, CalendarDays, Medal, Users } from 'lucide-react'
+import { Flame, Zap, Sigma, Target, Percent, Swords, Layers, Grid3x3, Calculator, Trophy, ShieldCheck, Spade, Copy, SquareStack, Shuffle, Dices, Compass, BookOpen, RotateCcw, CalendarDays, Medal, Users, Heart } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { TrainerId, useStats, accuracy, levelFor } from '@/store/stats'
@@ -9,7 +9,7 @@ import { PlayingCard, CardRow } from './PlayingCard'
 import { parseCard } from '@/lib/poker/cards'
 import { cn } from '@/lib/utils'
 
-export type ViewId = TrainerId | 'ranges' | 'calculator' | 'gto' | 'theory' | 'calendar' | 'achievements' | 'live' | 'home'
+export type ViewId = TrainerId | 'ranges' | 'calculator' | 'gto' | 'theory' | 'calendar' | 'achievements' | 'live' | 'donate' | 'home'
 
 interface ModeCard {
   id: ViewId
@@ -19,25 +19,68 @@ interface ModeCard {
   trainer?: TrainerId
 }
 
-const MODES: ModeCard[] = [
-  { id: 'sim', title: 'Симулятор раздач', desc: 'Решения на префлопе и постфлопе с разбором', icon: Zap, trainer: 'sim' },
-  { id: 'math', title: 'Математика', desc: 'Пот-оддсы, правило 2 и 4, MDF, SPR, комбинации и блефы', icon: Sigma, trainer: 'math' },
-  { id: 'outs', title: 'Аутсы и эквити', desc: '13 сценариев: от флеш-дро до отравленных аутсов', icon: Target, trainer: 'outs' },
-  { id: 'ev', title: 'EV-тренажёр', desc: 'Найдите верный EV колла из пяти вариантов', icon: Percent, trainer: 'ev' },
-  { id: 'winner', title: 'Кто победил?', desc: 'Определяйте выигрышную руку', icon: Swords, trainer: 'winner' },
-  { id: 'combo', title: 'Какая комбинация?', desc: 'Узнавайте силу собранной руки', icon: Layers, trainer: 'combo' },
-  { id: 'omaha', title: 'Омаха классическая', desc: '4 карты руки: ровно 2 + 3 с доски — кто победил?', icon: Spade, trainer: 'omaha' },
-  { id: 'omaha4', title: '4-card Омаха · 2 доски', desc: 'Двойной борд: какие доски вы выигрываете?', icon: Copy, trainer: 'omaha4' },
-  { id: 'omaha5', title: '5-card Омаха · 2 доски', desc: 'Пять карт руки на двух досках — чтение двух банков', icon: SquareStack, trainer: 'omaha5' },
-  { id: 'omaha4sim', title: 'Симулятор · 4-card Омаха (2 доски)', desc: 'Раздачи по GTO-чартам позиций: фолд, колл или рейз с разбором', icon: Shuffle, trainer: 'omaha4sim' },
-  { id: 'omaha5sim', title: 'Симулятор · 5-card Омаха (2 доски)', desc: 'Диапазоны позиции и эквити двух досок с переходом в GTO', icon: Dices, trainer: 'omaha5sim' },
-  { id: 'live', title: 'Живая игра', desc: 'Визуальный стол 2–9 игроков: полные раздачи от префлопа до ривера — Холдэм и Омахи', icon: Users },
-  { id: 'ranges', title: 'Диапазоны префлоп', desc: 'Чарты 6-max по позициям', icon: Grid3x3 },
-  { id: 'gto', title: 'GTO-чарты', desc: 'Стол, позиция, соперники и раунд: что играть, что сбрасывать', icon: Compass },
-  { id: 'theory', title: 'Теория покера', desc: 'Аутсы, правило 2 и 4, пот-оддсы, EV, MDF и SPR — справочник с примерами', icon: BookOpen },
-  { id: 'calculator', title: 'Калькулятор эквити', desc: 'Холдем и Омаха 4/5 карт: до 8 оппонентов и выбор диапазонов', icon: Calculator },
-  { id: 'calendar', title: 'Календарь занятий', desc: 'Статистика прохождения упражнений по дням: активность, точность, серии', icon: CalendarDays },
-  { id: 'achievements', title: 'Достижения', desc: 'Уровни XP и бейджи: серии дней, дневные цели, экзамены', icon: Medal },
+interface Category {
+  title: string
+  icon: typeof Zap
+  items: ModeCard[]
+}
+
+const CATEGORIES: Category[] = [
+  {
+    title: 'Симуляторы',
+    icon: Shuffle,
+    items: [
+      { id: 'sim', title: 'Симулятор Holdem', desc: 'Решения на префлопе и постфлопе с разбором', icon: Zap, trainer: 'sim' },
+      { id: 'omahaSim', title: 'Симулятор Омаха', desc: 'Классическая 4-card Омаха: решения по GTO-чартам и эквити', icon: Dices, trainer: 'omahaSim' },
+      { id: 'omaha4sim', title: 'Симулятор 4-card Омаха (2 доски)', desc: 'Раздачи по GTO-чартам позиций: фолд, колл или рейз с разбором', icon: Copy, trainer: 'omaha4sim' },
+      { id: 'omaha5sim', title: 'Симулятор 5-card Омаха (2 доски)', desc: 'Диапазоны позиции и эквити двух досок с переходом в GTO', icon: SquareStack, trainer: 'omaha5sim' },
+      { id: 'live', title: 'Живая игра', desc: 'Визуальный стол 2–9 игроков: полные раздачи от префлопа до ривера — Холдэм и Омахи', icon: Users },
+    ],
+  },
+  {
+    title: 'Тренажеры',
+    icon: Target,
+    items: [
+      { id: 'math', title: 'Математика', desc: 'Пот-оддсы, правило 2 и 4, MDF, SPR, комбинации и блефы', icon: Sigma, trainer: 'math' },
+      { id: 'outs', title: 'Аутсы и эквити', desc: '13 сценариев: от флеш-дро до отравленных аутсов', icon: Target, trainer: 'outs' },
+      { id: 'ev', title: 'EV-тренажёр', desc: 'Найдите верный EV колла из пяти вариантов', icon: Percent, trainer: 'ev' },
+      { id: 'winner', title: 'Кто победил? Holdem', desc: 'Определяйте выигрышную руку в Холдеме', icon: Swords, trainer: 'winner' },
+      { id: 'omaha', title: 'Кто победил? Омаха', desc: '4 карты руки: ровно 2 + 3 с доски — кто победил?', icon: Spade, trainer: 'omaha' },
+      { id: 'omaha4', title: 'Кто победил? 4-card Омаха (2 доски)', desc: 'Двойной борд: какие доски вы выигрываете?', icon: Copy, trainer: 'omaha4' },
+      { id: 'omaha5', title: 'Кто победил? 5-card Омаха (2 доски)', desc: 'Пять карт руки на двух досках — чтение двух банков', icon: SquareStack, trainer: 'omaha5' },
+      { id: 'combo', title: 'Какая комбинация?', desc: 'Узнавайте силу собранной руки', icon: Layers, trainer: 'combo' },
+    ],
+  },
+  {
+    title: 'Калькулятор эквити',
+    icon: Calculator,
+    items: [
+      { id: 'calculator', title: 'Калькулятор эквити', desc: 'Холдем и Омаха 4/5 карт: до 8 оппонентов и выбор диапазонов', icon: Calculator },
+    ],
+  },
+  {
+    title: 'Теория покера',
+    icon: BookOpen,
+    items: [
+      { id: 'theory', title: 'Теория покера', desc: 'Аутсы, правило 2 и 4, пот-оддсы, EV, MDF и SPR — справочник с примерами', icon: BookOpen },
+    ],
+  },
+  {
+    title: 'Диапазоны',
+    icon: Grid3x3,
+    items: [
+      { id: 'gto', title: 'GTO-чарты', desc: 'Стол, позиция, соперники и раунд: что играть, что сбрасывать', icon: Compass },
+      { id: 'ranges', title: 'Диапазоны префлоп', desc: 'Чарты 6-max по позициям', icon: Grid3x3 },
+    ],
+  },
+  {
+    title: 'Прогресс',
+    icon: Medal,
+    items: [
+      { id: 'calendar', title: 'Календарь', desc: 'Статистика прохождения упражнений по дням: активность, точность, серии', icon: CalendarDays },
+      { id: 'achievements', title: 'Достижения', desc: 'Уровни XP и бейджи: серии дней, дневные цели, экзамены', icon: Medal },
+    ],
+  },
 ]
 
 export function HomeView({ onSelect }: { onSelect: (v: ViewId) => void }) {
@@ -138,32 +181,68 @@ export function HomeView({ onSelect }: { onSelect: (v: ViewId) => void }) {
         </button>
       </section>
 
-      {/* Режимы */}
-      <section aria-label="Режимы тренировки" className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {MODES.map((m) => {
-          const Icon = m.icon
-          const acc = m.trainer ? accuracy(stats[m.trainer].correct, stats[m.trainer].attempts) : null
-          return (
-            <button key={m.id} type="button" onClick={() => onSelect(m.id)} className="text-left">
-              <Card className="border-stone-800 bg-gradient-to-br from-neutral-800/70 to-neutral-900/85 hover:from-neutral-700/75 hover:to-neutral-800/95 transition-all hover:border-emerald-500/40 h-full">
-                <CardContent className="p-4 flex items-start gap-3">
-                  <div className="mt-0.5 w-10 h-10 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0">
-                    <Icon className="w-5 h-5 text-emerald-400" />
-                  </div>
-                  <div className="min-w-0">
-                    <h2 className="font-normal text-stone-100 text-base sm:text-lg">{m.title}</h2>
-                    <p className="text-xs text-stone-400 mt-0.5">{m.desc}</p>
-                    {acc !== null && (
-                      <p className={cn('text-xs mt-1.5 font-normal', acc >= 70 ? 'text-emerald-400' : 'text-stone-400')}>
-                        Точность: {acc}%
-                      </p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </button>
-          )
-        })}
+      {/* Режимы по категориям */}
+      {CATEGORIES.map((cat) => {
+        const CatIcon = cat.icon
+        return (
+          <section key={cat.title} aria-label={cat.title} className="flex flex-col gap-3">
+            {cat.items.length > 1 && (
+              <h2 className="text-xs font-normal text-stone-400 uppercase tracking-wider flex items-center gap-2 px-1">
+                <CatIcon className="w-4 h-4 text-emerald-500" />
+                {cat.title}
+              </h2>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {cat.items.map((m) => {
+                const Icon = m.icon
+                const acc = m.trainer ? accuracy(stats[m.trainer].correct, stats[m.trainer].attempts) : null
+                return (
+                  <button key={m.id} type="button" onClick={() => onSelect(m.id)} className="text-left">
+                    <Card className="border-stone-800 bg-gradient-to-br from-neutral-800/70 to-neutral-900/85 hover:from-neutral-700/75 hover:to-neutral-800/95 transition-all hover:border-emerald-500/40 h-full">
+                      <CardContent className="p-4 flex items-start gap-3">
+                        <div className="mt-0.5 w-10 h-10 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                          <Icon className="w-5 h-5 text-emerald-400" />
+                        </div>
+                        <div className="min-w-0">
+                          <h2 className="font-normal text-stone-100 text-base sm:text-lg">{m.title}</h2>
+                          <p className="text-xs text-stone-400 mt-0.5">{m.desc}</p>
+                          {acc !== null && (
+                            <p className={cn('text-xs mt-1.5 font-normal', acc >= 70 ? 'text-emerald-400' : 'text-stone-400')}>
+                              Точность: {acc}%
+                            </p>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+        )
+      })}
+
+      {/* Помочь проекту */}
+      <section aria-label="Помочь проекту" className="flex flex-col gap-3">
+        <h2 className="text-xs font-normal text-stone-400 uppercase tracking-wider flex items-center gap-2 px-1">
+          <Heart className="w-4 h-4 text-emerald-500" />
+          Помочь проекту
+        </h2>
+        <button type="button" onClick={() => onSelect('donate')} className="text-left">
+          <Card className="border-emerald-900/60 bg-gradient-to-br from-emerald-950/50 to-neutral-900/85 hover:from-emerald-900/40 hover:to-neutral-800/95 transition-all hover:border-emerald-500/40">
+            <CardContent className="p-4 flex items-start gap-3">
+              <div className="mt-0.5 w-10 h-10 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                <Heart className="w-5 h-5 text-emerald-400" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="font-normal text-stone-100 text-base sm:text-lg">Поддержать на Boosty</h2>
+                <p className="text-xs text-stone-400 mt-0.5">
+                  Донат помогает платить за хостинг и развивать тренажёр. Необязательно — все режимы остаются бесплатными.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </button>
       </section>
 
       {/* Информация */}

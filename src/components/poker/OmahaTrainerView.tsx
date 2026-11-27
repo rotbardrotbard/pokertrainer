@@ -24,15 +24,15 @@ const TRAINER_BY_VARIANT: Record<OmahaVariant, 'omaha' | 'omaha4' | 'omaha5'> = 
 
 const META: Record<OmahaVariant, { title: string; subtitle: string }> = {
   classic: {
-    title: 'Омаха классическая',
+    title: 'Кто победил? Омаха',
     subtitle: 'Кто победил: ровно 2 карты из руки и 3 с доски',
   },
   double4: {
-    title: '4-card Омаха · 2 доски',
+    title: 'Кто победил? 4-card Омаха (2 доски)',
     subtitle: 'Двойной борд: на каких досках выигрывает ваша рука?',
   },
   double5: {
-    title: '5-card Омаха · 2 доски',
+    title: 'Кто победил? 5-card Омаха (2 доски)',
     subtitle: 'Пять карт руки на двух досках — определите победителя каждой',
   },
 }
