@@ -58,13 +58,20 @@ st = useStats.getState()
 assert(st.xp === 9 + 16 + 10 + EXAM_PASS_XP + EXAM_GREAT_XP, 'экзамен 50% не даёт XP')
 
 // ===== уровни: пороги и прогресс =====
-assert(LEVELS.length === 7, '7 уровней')
-assert(LEVELS.map((l) => l.name).join(',') === 'Фиш,Любитель,Микро-гриндер,Регуляр,TAG-игрок,Шарк,GTO-мастер', 'названия уровней по согласованию')
+assert(LEVELS.length === 10, '10 уровней')
+assert(LEVELS.map((l) => l.name).join(',') === 'Фиш,Любитель,Микро-гриндер,Регуляр,TAG-игрок,Шарк,Гриндер,Профи,Мастер,GTO-мастер', 'названия уровней по согласованию')
+assert(LEVELS.every((l, i) => i === 0 || l.xp > LEVELS[i - 1].xp), 'пороги возрастают')
 assert(levelFor(0).name === 'Фиш' && levelFor(0).index === 0, '0 XP → Фиш')
 assert(levelFor(99).name === 'Фиш', '99 XP → ещё Фиш')
 assert(levelFor(100).name === 'Любитель' && levelFor(100).progress === 0, '100 XP → Любитель, прогресс 0')
 assert(levelFor(700).name === 'Регуляр', '700 XP → Регуляр')
-assert(levelFor(3500).name === 'GTO-мастер' && levelFor(3500).next === null && levelFor(3500).progress === 1, '3500 XP → GTO-мастер, максимум')
+assert(levelFor(1200).name === 'TAG-игрок', '1200 XP → TAG-игрок')
+assert(levelFor(3199).name === 'Шарк', '3199 XP → ещё Шарк')
+assert(levelFor(3200).name === 'Гриндер' && levelFor(3200).progress === 0, '3200 XP → Гриндер')
+assert(levelFor(5000).name === 'Профи', '5000 XP → Профи')
+assert(levelFor(8000).name === 'Мастер', '8000 XP → Мастер')
+assert(levelFor(12499).name === 'Мастер', '12499 XP → ещё Мастер')
+assert(levelFor(12500).name === 'GTO-мастер' && levelFor(12500).next === null && levelFor(12500).progress === 1, '12500 XP → GTO-мастер, максимум')
 
 // ===== бейджи: предикаты на синтетическом снапшоте =====
 const snap = {

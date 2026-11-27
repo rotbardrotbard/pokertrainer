@@ -5,7 +5,7 @@ import { ArrowLeft, Medal, Lock, Zap, Flame, Trophy, GraduationCap, Sparkles, Ta
 import type { LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { useStats, levelFor, XP_PER_CORRECT, STREAK_DAY_XP, STREAK_DAY_CAP, DAILY_GOAL_STEP, DAILY_GOAL_XP, EXAM_PASS_XP, EXAM_GREAT_XP } from '@/store/stats'
+import { useStats, levelFor, LEVELS, XP_PER_CORRECT, STREAK_DAY_XP, STREAK_DAY_CAP, DAILY_GOAL_STEP, DAILY_GOAL_XP, EXAM_PASS_XP, EXAM_GREAT_XP } from '@/store/stats'
 import { evaluateBadges } from '@/lib/achievements'
 import { cn } from '@/lib/utils'
 
@@ -71,7 +71,7 @@ export function AchievementsView({ onBack }: { onBack: () => void }) {
             <Medal className="w-7 h-7 text-emerald-400" />
           </div>
           <div>
-            <p className="text-xs text-stone-400">Текущий уровень · уровень {lvl.index + 1} из 7</p>
+            <p className="text-xs text-stone-400">Текущий уровень · уровень {lvl.index + 1} из {LEVELS.length}</p>
             <h2 className="text-2xl sm:text-3xl font-normal text-emerald-400">{lvl.name}</h2>
             <p className="text-sm text-stone-300 mt-1">{xp} XP</p>
           </div>
