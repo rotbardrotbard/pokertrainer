@@ -61,3 +61,6 @@ server.log
 
 # agent tool outputs (junk)
 tool-results/
+
+# user uploads (do not publish)
+/upload/
