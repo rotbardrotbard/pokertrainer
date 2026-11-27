@@ -58,3 +58,6 @@ server.log
 
 # sandbox helper scripts (not part of the app)
 /.zscripts
+
+# agent tool outputs (junk)
+tool-results/
