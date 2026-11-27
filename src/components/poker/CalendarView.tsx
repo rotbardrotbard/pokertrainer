@@ -6,7 +6,7 @@ import { useMemo, useState } from 'react'
 import { ArrowLeft, ChevronLeft, ChevronRight, Flame, Info, Trophy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { TrainerId, useStats, accuracy, DayEntry, DayTrainerStat } from '@/store/stats'
+import { TrainerId, useStats, accuracy, DayTrainerStat, dayEntryTotals } from '@/store/stats'
 import { cn } from '@/lib/utils'
 
 // русские подписи режимов — те же названия, что и на главной
@@ -48,20 +48,6 @@ function parseKey(key: string): { y: number; m: number; d: number } {
 function formatDateRu(sel: { y: number; m: number; d: number }): string {
   const s = new Date(sel.y, sel.m, sel.d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', weekday: 'long' })
   return s.charAt(0).toUpperCase() + s.slice(1)
-}
-
-/** Сумма ответов за день по всем режимам */
-function sumEntry(e?: DayEntry): { attempts: number; correct: number } {
-  let attempts = 0
-  let correct = 0
-  if (e) {
-    for (const t of Object.values(e.t)) {
-      if (!t) continue
-      attempts += t.attempts
-      correct += t.correct
-    }
-  }
-  return { attempts, correct }
 }
 
 /** Цвет ячейки по числу ответов за день */
@@ -107,7 +93,7 @@ export function CalendarView({ onBack }: { onBack: () => void }) {
     for (let i = 0; i < lead; i++) out.push({ d: -1, key: '', attempts: 0, isToday: false, isFuture: false })
     for (let d = 1; d <= totalDays; d++) {
       const key = keyOf(cursor.y, cursor.m, d)
-      const { attempts } = sumEntry(dayLog[key])
+      const { attempts } = dayEntryTotals(dayLog[key])
       const isFuture = new Date(cursor.y, cursor.m, d).getTime() > new Date().getTime()
       out.push({ d, key, attempts, isToday: key === today, isFuture })
     }
@@ -123,7 +109,7 @@ export function CalendarView({ onBack }: { onBack: () => void }) {
     let activeDays = 0
     let best: { day: number; attempts: number } | null = null
     for (let d = 1; d <= totalDays; d++) {
-      const { attempts: a, correct: c } = sumEntry(dayLog[keyOf(cursor.y, cursor.m, d)])
+      const { attempts: a, correct: c } = dayEntryTotals(dayLog[keyOf(cursor.y, cursor.m, d)])
       if (a > 0) {
         activeDays++
         attempts += a
@@ -134,12 +120,12 @@ export function CalendarView({ onBack }: { onBack: () => void }) {
     return { totalDays, attempts, acc: accuracy(correct, attempts), activeDays, best }
   }, [dayLog, cursor])
 
-  const hasAnyData = Object.keys(dayLog).some((k) => sumEntry(dayLog[k]).attempts > 0)
+  const hasAnyData = Object.values(dayLog).some((e) => dayEntryTotals(e).attempts > 0)
 
   // детали выбранного дня
   const sel = parseKey(selected)
   const selEntry = dayLog[selected]
-  const selTotals = sumEntry(selEntry)
+  const selTotals = dayEntryTotals(selEntry)
   const selAcc = accuracy(selTotals.correct, selTotals.attempts)
   const selTrainers: [TrainerId, DayTrainerStat][] = selEntry
     ? (Object.entries(selEntry.t) as [TrainerId, DayTrainerStat][])

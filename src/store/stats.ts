@@ -4,6 +4,47 @@ import { persist } from 'zustand/middleware'
 
 export type TrainerId = 'sim' | 'math' | 'outs' | 'ev' | 'winner' | 'combo' | 'omaha' | 'omaha4' | 'omaha5' | 'omaha4sim' | 'omaha5sim'
 
+export const TRAINER_IDS: TrainerId[] = ['sim', 'math', 'outs', 'ev', 'winner', 'combo', 'omaha', 'omaha4', 'omaha5', 'omaha4sim', 'omaha5sim']
+
+// ===== Модель XP (уровни достижений) =====
+// XP строится на трёх факторах: верные ответы, серия дней без пропуска,
+// верные ответы внутри дня (дневная цель).
+export const XP_PER_CORRECT = 2 // за каждый верный ответ
+export const STREAK_DAY_XP = 5 // за каждый день активной серии
+export const STREAK_DAY_CAP = 7 // максимум дней серии, за которые даётся бонус (+35 XP/день)
+export const DAILY_GOAL_STEP = 10 // размер шага дневной цели, верных ответов
+export const DAILY_GOAL_XP = 10 // бонус за каждые 10 верных ответов за день
+export const EXAM_PASS_XP = 30 // экзамен сдан (>= 70%)
+export const EXAM_GREAT_XP = 50 // экзамен >= 90%
+
+/** Уровень достижений: имя и порог XP */
+export interface Level {
+  name: string
+  xp: number
+}
+
+export const LEVELS: Level[] = [
+  { name: 'Фиш', xp: 0 },
+  { name: 'Любитель', xp: 100 },
+  { name: 'Микро-гриндер', xp: 300 },
+  { name: 'Регуляр', xp: 700 },
+  { name: 'TAG-игрок', xp: 1200 },
+  { name: 'Шарк', xp: 2000 },
+  { name: 'GTO-мастер', xp: 3500 },
+]
+
+/** Текущий уровень по накопленному XP */
+export function levelFor(xp: number): { index: number; name: string; next: Level | null; progress: number } {
+  let idx = 0
+  for (let i = 0; i < LEVELS.length; i++) {
+    if (xp >= LEVELS[i].xp) idx = i
+  }
+  const cur = LEVELS[idx]
+  const next = idx + 1 < LEVELS.length ? LEVELS[idx + 1] : null
+  const progress = next ? (xp - cur.xp) / (next.xp - cur.xp) : 1
+  return { index: idx, name: cur.name, next, progress: Math.max(0, Math.min(1, progress)) }
+}
+
 export interface TrainerStats {
   attempts: number
   correct: number
@@ -36,6 +77,20 @@ export function emptyDayEntry(): DayEntry {
   return { t: {}, exams: [] }
 }
 
+/** Сумма ответов дня по всем режимам */
+export function dayEntryTotals(e?: DayEntry): { attempts: number; correct: number } {
+  let attempts = 0
+  let correct = 0
+  if (e) {
+    for (const t of Object.values(e.t)) {
+      if (!t) continue
+      attempts += t.attempts
+      correct += t.correct
+    }
+  }
+  return { attempts, correct }
+}
+
 function emptyT(): TrainerStats {
   return { attempts: 0, correct: 0, hints: 0, exams: 0, examBest: 0, sessionAttempts: 0, sessionCorrect: 0 }
 }
@@ -46,6 +101,12 @@ interface StatsState {
   kindStats: Record<string, { attempts: number; correct: number }>
   /** дневной журнал: ключ 'YYYY-MM-DD' → ответы по режимам и экзамены этого дня */
   dayLog: Record<string, DayEntry>
+  /** накопленный XP для уровней достижений */
+  xp: number
+  /** серия верных ответов подряд (без неверных) */
+  answerStreak: number
+  /** лучший рекорд верных ответов подряд */
+  bestAnswerStreak: number
   streak: number
   bestStreak: number
   lastPlayedDate: string | null
@@ -57,9 +118,8 @@ interface StatsState {
 }
 
 function emptyStats(): Record<TrainerId, TrainerStats> {
-  const ids: TrainerId[] = ['sim', 'math', 'outs', 'ev', 'winner', 'combo', 'omaha', 'omaha4', 'omaha5', 'omaha4sim', 'omaha5sim']
   const out = {} as Record<TrainerId, TrainerStats>
-  for (const id of ids) out[id] = emptyT()
+  for (const id of TRAINER_IDS) out[id] = emptyT()
   return out
 }
 
@@ -80,6 +140,9 @@ export const useStats = create<StatsState>()(
       stats: emptyStats(),
       kindStats: {},
       dayLog: {},
+      xp: 0,
+      answerStreak: 0,
+      bestAnswerStreak: 0,
       streak: 0,
       bestStreak: 0,
       lastPlayedDate: null,
@@ -97,7 +160,19 @@ export const useStats = create<StatsState>()(
         }
         // дневной журнал для календаря занятий
         const day = s.dayLog?.[today] ?? emptyDayEntry()
+        const dayBefore = dayEntryTotals(day)
         const dt = day.t[trainer] ?? { attempts: 0, correct: 0 }
+
+        // XP: верные ответы + бонус за день серии + дневная цель
+        const isFirstAnswerOfDay = dayBefore.attempts === 0
+        const streakBonus = isFirstAnswerOfDay && correct ? STREAK_DAY_XP * Math.min(streak, STREAK_DAY_CAP) : 0
+        const newDayCorrect = dayBefore.correct + (correct ? 1 : 0)
+        const goalBonus = correct && Math.floor(newDayCorrect / DAILY_GOAL_STEP) > Math.floor(dayBefore.correct / DAILY_GOAL_STEP) ? DAILY_GOAL_XP : 0
+        const gainedXp = (correct ? XP_PER_CORRECT : 0) + streakBonus + goalBonus
+
+        const answerStreak = correct ? (s.answerStreak ?? 0) + 1 : 0
+        const bestAnswerStreak = Math.max(s.bestAnswerStreak ?? 0, answerStreak)
+
         set({
           stats: {
             ...s.stats,
@@ -122,6 +197,9 @@ export const useStats = create<StatsState>()(
               },
             },
           },
+          xp: (s.xp ?? 0) + gainedXp,
+          answerStreak,
+          bestAnswerStreak,
           streak,
           bestStreak,
           lastPlayedDate: today,
@@ -151,7 +229,8 @@ export const useStats = create<StatsState>()(
         const s = get()
         const t = s.stats[trainer] ?? emptyT()
         const pct = total > 0 ? Math.round((correct / total) * 100) : 0
-        // результат экзамена попадает и в дневной журнал
+        // результат экзамена попадает и в дневной журнал; за сданный экзамен — бонус XP
+        const examXp = pct >= 90 ? EXAM_GREAT_XP : pct >= 70 ? EXAM_PASS_XP : 0
         const today = todayStr()
         const day = s.dayLog?.[today] ?? emptyDayEntry()
         set({
@@ -167,6 +246,7 @@ export const useStats = create<StatsState>()(
             ...s.dayLog,
             [today]: { ...day, exams: [...day.exams, { trainer, pct }].slice(-20) },
           },
+          xp: (s.xp ?? 0) + examXp,
         })
       },
       resetSession: (trainer) => {
@@ -176,7 +256,16 @@ export const useStats = create<StatsState>()(
           stats: { ...s.stats, [trainer]: { ...t, sessionAttempts: 0, sessionCorrect: 0 } },
         })
       },
-      resetAll: () => set({ stats: emptyStats(), kindStats: {}, dayLog: {}, streak: 0, lastPlayedDate: null }),
+      resetAll: () => set({
+        stats: emptyStats(),
+        kindStats: {},
+        dayLog: {},
+        xp: 0,
+        answerStreak: 0,
+        bestAnswerStreak: 0,
+        streak: 0,
+        lastPlayedDate: null,
+      }),
     }),
     {
       name: 'poker-trainer-stats',
@@ -187,7 +276,19 @@ export const useStats = create<StatsState>()(
         for (const k of Object.keys(merged) as TrainerId[]) {
           merged[k] = { ...merged[k], ...(p.stats?.[k] ?? {}) }
         }
-        return { ...current, ...p, stats: merged, kindStats: p.kindStats ?? {}, dayLog: p.dayLog ?? {} }
+        // миграция: у пользователей без XP начисляем его за накопленные верные ответы,
+        // чтобы уровень не сбросился в ноль после обновления
+        const backfillXp = Object.values(merged).reduce((a, t) => a + t.correct, 0) * XP_PER_CORRECT
+        return {
+          ...current,
+          ...p,
+          stats: merged,
+          kindStats: p.kindStats ?? {},
+          dayLog: p.dayLog ?? {},
+          xp: p.xp ?? backfillXp,
+          answerStreak: p.answerStreak ?? 0,
+          bestAnswerStreak: p.bestAnswerStreak ?? 0,
+        }
       },
     },
   ),

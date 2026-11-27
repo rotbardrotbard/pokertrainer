@@ -16,6 +16,7 @@ import { CalculatorView } from '@/components/poker/CalculatorView'
 import { GtoView } from '@/components/poker/GtoView'
 import { TheoryView } from '@/components/poker/TheoryView'
 import { CalendarView } from '@/components/poker/CalendarView'
+import { AchievementsView } from '@/components/poker/AchievementsView'
 import type { GtoInitial } from '@/components/poker/GtoView'
 
 export default function Home() {
@@ -70,6 +71,8 @@ export default function Home() {
       return <CalculatorView onBack={back} />
     case 'calendar':
       return <CalendarView onBack={back} />
+    case 'achievements':
+      return <AchievementsView onBack={back} />
     default:
       return <HomeView onSelect={setView} />
   }

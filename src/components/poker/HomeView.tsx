@@ -1,15 +1,15 @@
 'use client'
 
 // Главная: режимы тренировки, статистика, серия дней
-import { Flame, Zap, Sigma, Target, Percent, Swords, Layers, Grid3x3, Calculator, Trophy, ShieldCheck, Spade, Copy, SquareStack, Shuffle, Dices, Compass, BookOpen, RotateCcw, CalendarDays } from 'lucide-react'
+import { Flame, Zap, Sigma, Target, Percent, Swords, Layers, Grid3x3, Calculator, Trophy, ShieldCheck, Spade, Copy, SquareStack, Shuffle, Dices, Compass, BookOpen, RotateCcw, CalendarDays, Medal } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
-import { TrainerId, useStats, accuracy } from '@/store/stats'
+import { TrainerId, useStats, accuracy, levelFor } from '@/store/stats'
 import { PlayingCard, CardRow } from './PlayingCard'
 import { parseCard } from '@/lib/poker/cards'
 import { cn } from '@/lib/utils'
 
-export type ViewId = TrainerId | 'ranges' | 'calculator' | 'gto' | 'theory' | 'calendar' | 'home'
+export type ViewId = TrainerId | 'ranges' | 'calculator' | 'gto' | 'theory' | 'calendar' | 'achievements' | 'home'
 
 interface ModeCard {
   id: ViewId
@@ -36,13 +36,16 @@ const MODES: ModeCard[] = [
   { id: 'theory', title: 'Теория покера', desc: 'Аутсы, правило 2 и 4, пот-оддсы, EV, MDF и SPR — справочник с примерами', icon: BookOpen },
   { id: 'calculator', title: 'Калькулятор эквити', desc: 'Холдем и Омаха 4/5 карт: до 8 оппонентов и выбор диапазонов', icon: Calculator },
   { id: 'calendar', title: 'Календарь занятий', desc: 'Статистика прохождения упражнений по дням: активность, точность, серии', icon: CalendarDays },
+  { id: 'achievements', title: 'Достижения', desc: 'Уровни XP и бейджи: серии дней, дневные цели, экзамены', icon: Medal },
 ]
 
 export function HomeView({ onSelect }: { onSelect: (v: ViewId) => void }) {
   const stats = useStats((s) => s.stats)
   const streak = useStats((s) => s.streak)
   const bestStreak = useStats((s) => s.bestStreak)
+  const xp = useStats((s) => s.xp ?? 0)
   const resetAll = useStats((s) => s.resetAll)
+  const lvl = levelFor(xp)
 
   const totalAttempts = Object.values(stats).reduce((a, t) => a + t.attempts, 0)
   const totalCorrect = Object.values(stats).reduce((a, t) => a + t.correct, 0)
@@ -93,7 +96,7 @@ export function HomeView({ onSelect }: { onSelect: (v: ViewId) => void }) {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Сбросить всю статистику?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Будут удалены ответы по всем режимам, статистика по типам задач и серия дней. Действие необратимо.
+                    Будут удалены ответы по всем режимам, статистика по типам задач, дневная статистика, серия дней, XP и бейджи. Действие необратимо.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -109,6 +112,29 @@ export function HomeView({ onSelect }: { onSelect: (v: ViewId) => void }) {
             </AlertDialog>
           )}
         </div>
+
+        {/* Уровень: XP за верные ответы, серии дней и дневные цели */}
+        <button
+          type="button"
+          onClick={() => onSelect('achievements')}
+          className="w-full max-w-md"
+          aria-label="Открыть достижения"
+        >
+          <div className="flex items-center gap-2.5 rounded-lg border border-stone-800 bg-stone-900/50 px-3 py-2.5 hover:border-emerald-500/40 transition text-left">
+            <Medal className="w-4 h-4 text-emerald-500 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span className="text-stone-200">Уровень: {lvl.name} · {xp} XP</span>
+                {lvl.next
+                  ? <span className="text-stone-500">до «{lvl.next.name}» {lvl.next.xp - xp} XP</span>
+                  : <span className="text-emerald-400">максимальный уровень</span>}
+              </div>
+              <div className="h-1.5 rounded-full bg-stone-800 overflow-hidden mt-1.5">
+                <div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.round(lvl.progress * 100)}%` }} />
+              </div>
+            </div>
+          </div>
+        </button>
       </section>
 
       {/* Режимы */}
