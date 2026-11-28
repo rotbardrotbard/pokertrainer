@@ -244,7 +244,11 @@ export class LiveHand {
     this.currentBet = BB
     this.lastRaiseSize = BB
     this.log.push(`Блайнды: SB ${fmt(SB)} / BB ${fmt(BB)}. Вы на позиции ${this.seats[this.heroIdx].seat}.`)
-    this.actorPtr = 0
+    // actorPtr = «кто действовал последним»: на префлопе это BB (поставил блайнд),
+    // поэтому первый претендент — seats[0] (UTG, он же первый в seatsForTable).
+    // Раньше тут стояло 0 — и первый игрок круга (UTG) пропускался до конца орбиты:
+    // он действовал уже ПОСЛЕ бета блайнда (виден в логе после рейза BB).
+    this.actorPtr = this.players - 1
     this.awaitNextActor()
   }
 
@@ -408,7 +412,8 @@ export class LiveHand {
     else if (act === 'call') this.apply(p, 'call')
     else {
       const target = defaultRaiseTo(this.pot(), this.currentBet, this.lastRaiseSize, true, this.betCount)
-      this.apply(p, this.betCount > 0 ? 'raise' : 'bet', target)
+      // на префлопе повышение — всегда «рейз до X» (даже первый агрессивный)
+      this.apply(p, this.street === 'preflop' || this.betCount > 0 ? 'raise' : 'bet', target)
     }
   }
 
@@ -635,7 +640,10 @@ export class LiveHand {
       const chart = holdemPreflop(p.pos, this.players, situation, callers, this.raiserPos() ?? undefined)
       const cls = handClass(p.cards[0], p.cards[1])
       const base = holdemAction(cls, chart)
-      const act: LiveActionKind = base === 'raise' ? (this.betCount > 0 ? 'raise' : 'bet') : base === 'call' ? (toCall > 0 ? 'call' : 'check') : toCall > 0 ? 'fold' : 'check'
+      // на префлопе агрессия — всегда рейз (даже на открытии): действие героя
+      // «Рейз» мапится в 'raise', грейд должен совпадать (иначе верный рейз
+      // помечался бы ошибкой)
+      const act: LiveActionKind = base === 'raise' ? 'raise' : base === 'call' ? (toCall > 0 ? 'call' : 'check') : toCall > 0 ? 'fold' : 'check'
       const f = situation === 'vsraise' ? chart.freq.get(cls) ?? null : null
       const pctNote = situation === 'open'
         ? `диапазон открытия с ${p.seat} ≈ топ ${Math.round(chart.raisePct)}% рук`
@@ -648,7 +656,8 @@ export class LiveHand {
     const topPct = omahaHandPercentile(game, p.cards)
     let act: LiveActionKind
     if (situation === 'open') {
-      act = handInRange(game, p.cards, chart.openPercent) ? 'bet' : toCall > 0 ? 'fold' : 'check'
+      // открытие — это рейз (а не «бет»: префлоп текущая ставка = блайнд BB)
+      act = handInRange(game, p.cards, chart.openPercent) ? 'raise' : toCall > 0 ? 'fold' : 'check'
     } else if (handInRange(game, p.cards, chart.threeBetPercent)) {
       act = 'raise'
     } else if (handInRange(game, p.cards, chart.callPercent)) {
@@ -789,7 +798,8 @@ export class LiveHand {
       willRaise = handInRange(game, p.cards, percent)
     }
     if (willRaise && this.betCount < 2) {
-      this.apply(p, this.betCount > 0 ? 'raise' : 'bet', defaultRaiseTo(this.pot(), this.currentBet, this.lastRaiseSize, true, this.betCount))
+      // префлоп-агрессия героя — «рейз до X» (не «бет»)
+      this.apply(p, 'raise', defaultRaiseTo(this.pot(), this.currentBet, this.lastRaiseSize, true, this.betCount))
     } else {
       this.apply(p, this.toCallFor(p) > 0 ? 'call' : 'check')
     }

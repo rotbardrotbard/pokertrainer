@@ -72,23 +72,28 @@ console.log('=== 2. Кап оппонентов для Омахи 5-card × 2 д
 
 console.log('=== 3. Две доски — разные карты ===')
 {
-  // играем узловую раздачу до конца и проверяем доски
-  const hand = new LiveHand({ game: 'omaha4x2', bots: 2, mode: 'node' })
-  let guard = 0
-  while (!hand.snapshot().finished && guard++ < 1500) {
-    hand.skipToDecision()
+  // играем узловые раздачи (чек/колл героя) до первой дошедшей до ривера:
+  // случайная раздача может закончиться префлопом (все сбросили — герой забирает банк)
+  let snap: ReturnType<LiveHand['snapshot']> | null = null
+  for (let attempt = 0; attempt < 25 && !snap; attempt++) {
+    const hand = new LiveHand({ game: 'omaha4x2', bots: 2, mode: 'node' })
+    let guard = 0
+    while (!hand.snapshot().finished && guard++ < 1500) {
+      hand.skipToDecision()
+      const s = hand.snapshot()
+      if (s.awaitingHero && s.options) hand.heroAction(s.options.canCheck ? 'check' : 'call')
+    }
     const s = hand.snapshot()
-    if (s.awaitingHero && s.options) hand.heroAction(s.options.canCheck ? 'check' : 'call')
+    if (s.dealtPerBoard === 5) snap = s
   }
-  const snap = hand.snapshot()
-  if (snap.dealtPerBoard === 5) {
+  if (snap) {
     const a = snap.boards[0].map((c) => c.r + c.s).sort().join()
     const b = snap.boards[1].map((c) => c.r + c.s).sort().join()
     check(a !== b, 'доски получили разные карты')
     const all = [...snap.boards[0], ...snap.boards[1]]
     check(new Set(all.map((c) => c.r + '-' + c.s)).size === all.length, 'нет пересечений карт досок')
   } else {
-    check(false, `доски не доиграны до ривера (сдано ${snap.dealtPerBoard})`)
+    check(false, 'за 25 попыток не нашлось раздачи, дошедшей до ривера')
   }
 }
 
@@ -177,6 +182,83 @@ console.log('=== 7. Статистика грейдинга героя (сани
   }
   check(total > 30, `решений собрано: ${total}`)
   console.log(`  всегда-колл верен в ${correct}/${total} случаев (информативно, не проверка)`)
+}
+
+console.log('=== 8. Порядок действий на префлопе: первый — UTG (seats[0]) ===')
+{
+  // Регрессия: actorPtr стартовал с 0, цикл искал следующего actor со seat+1 —
+  // UTG пропускался до конца орбиты и действовал ПОСЛЕ рейза BB.
+  const games: LiveGame[] = ['holdem', 'omaha4', 'omaha5x2']
+  let bad = 0
+  let checked = 0
+  for (const game of games) {
+    for (let k = 0; k < 40; k++) {
+      const hand = new LiveHand({ game, bots: 3 + Math.floor(Math.random() * 4), mode: 'node' })
+      const anyHand = hand as any
+      if (anyHand.seats[0].isHero) continue // герой первый — пропускаем (шаг сделает он)
+      hand.step() // одно действие первого игрока круга
+      const log = anyHand.log as string[]
+      const firstAct = log[1] ?? ''
+      checked++
+      if (!firstAct.includes(`(${anyHand.seats[0].seat})`)) {
+        bad++
+        if (bad <= 3) console.error(`  ${game}: первое действие — «${firstAct}», ожидался ${anyHand.seats[0].seat}`)
+      }
+    }
+  }
+  check(checked > 50 && bad === 0, `первым действует seats[0] (${checked} раздач проверено, расхождений ${bad})`)
+}
+
+console.log('=== 9. Грейд префлопа: открытие = рейз, паритет с действием героя ===')
+{
+  // Регрессия: в открытых спотах грейд возвращал 'bet', а рейз героя мапился в 'raise' —
+  // даже верное открытие помечалось «Ошибка». Герой в открытом споте не мог ответить верно.
+  let openSpots = 0
+  let raiseGrades = 0
+  let correctByGrade = 0
+  let betGrades = 0
+  let bad = 0
+  for (let k = 0; k < 150 && openSpots < 30; k++) {
+    const game: LiveGame = k % 2 === 0 ? 'holdem' : 'omaha4'
+    const hand = new LiveHand({ game, bots: 2 + Math.floor(Math.random() * 4), mode: 'full' })
+    const anyHand = hand as any
+    let guard = 0
+    while (!hand.snapshot().finished && guard++ < 400 && openSpots < 30) {
+      hand.skipToDecision()
+      const s = hand.snapshot()
+      if (s.finished) break
+      if (!s.awaitingHero) { hand.step(); continue }
+      if (anyHand.street === 'preflop' && anyHand.currentBet <= BB && anyHand.betCount === 0) {
+        // открытый спот: никто не повышал, герой решает до лимпа/рейза
+        openSpots++
+        const grade = anyHand.heroPreflopGrade(anyHand.hero())
+        if (grade.kind === 'bet') {
+          betGrades++
+          bad++
+          console.error('  грейд открытого префлоп-спота = «бет» (должен быть raise/fold/check/call)')
+        }
+        // играем строго по грейду — решение обязано быть «верным»
+        if (grade.kind === 'raise' || grade.kind === 'bet') hand.heroAction('raise')
+        else if (grade.kind === 'fold') hand.heroAction('fold')
+        else if (grade.kind === 'call') hand.heroAction('call')
+        else hand.heroAction('check')
+        if (grade.kind === 'raise') raiseGrades++
+        const d = hand.snapshot().decisions[hand.snapshot().decisions.length - 1]
+        if (d && d.correct) correctByGrade++
+        else if (d) {
+          bad++
+          if (bad <= 5) console.error(`  действие по грейду помечено ошибкой: chosen «${d.chosen}» vs best «${d.best}»`)
+        }
+        continue
+      }
+      const o = s.options!
+      hand.heroAction(o.canCheck ? 'check' : o.canCall ? 'call' : 'fold')
+    }
+  }
+  check(bad === 0, `паритет грейда и героя (${openSpots} открытых спотов, расхождений ${bad})`)
+  check(betGrades === 0, `нет «бет»-грейдов на префлопе (${betGrades})`)
+  check(raiseGrades > 0, `грейдов «рейз» на открытии: ${raiseGrades}`)
+  check(correctByGrade === openSpots, `действие по грейду всегда верно: ${correctByGrade}/${openSpots}`)
 }
 
 console.log(failed === 0 ? '\nOK: движок живой игры работает' : `\nПРОВАЛОВ: ${failed}`)
