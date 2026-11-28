@@ -3,7 +3,7 @@
 // (размер стола меняет ширину диапазона, рука оценивается как «топ X%»).
 // Постфлоп: Monte-Carlo эквити на двух досках против случайной руки,
 // решение по пот-оддсам (на каждой доске разыгрывается половина банка).
-import { Card, fullDeck, RANK_CHARS } from './cards'
+import { Card, fullDeck, RANK_LABELS } from './cards'
 import { handName } from './evaluator'
 import { bestOmahaHand } from './omaha'
 import { Position, POSITION_NAMES_RU, dominantAction, secondaryAction, freqLabel } from './ranges'
@@ -257,7 +257,7 @@ export function analyzePloHand(cards: Card[]): PloProfile {
   // связка отображаем по убыванию, заменяя A=1 на A=14 для показа
   const runRanks: number[] = []
   for (let r = bestStart + runLen - 1; r >= bestStart; r--) runRanks.push(r === 1 ? 14 : r)
-  const runText = runLen >= 3 ? runRanks.map((r) => RANK_CHARS[r - 2]).join('-') : ''
+  const runText = runLen >= 3 ? runRanks.map((r) => RANK_LABELS[r - 2]).join('-') : ''
 
   // оценка (упрощённая, обучающая)
   let score = 0
@@ -285,14 +285,14 @@ export function analyzePloHand(cards: Card[]): PloProfile {
   if (runLen >= 4) features.push(`Связка ${runText}: стрит-потенциал сразу с нескольких концов`)
   else if (runLen === 3) features.push(`Мини-связка ${runText}: средний стрит-потенциал`)
   else features.push('Нет связки — слабый стрит-потенциал')
-  if (pairRank !== null) features.push(`Карманная пара ${RANK_CHARS[pairRank - 2]} в руке`)
+  if (pairRank !== null) features.push(`Карманная пара ${RANK_LABELS[pairRank - 2]} в руке`)
   if (tripInHand) features.push('Три карты одного ранга в руке — мёртвый вес в Омахе')
 
   const parts: string[] = []
   if (aces > 0) parts.push(aces >= 2 ? 'два туза' : 'с тузом')
   if (suitedCount >= 2 || suitedSuits.length === 1) parts.push(suitedLabel.split(' (')[0])
   if (runLen >= 3) parts.push(`связка ${runText}`)
-  if (pairRank !== null && aces < 2) parts.push(`пара ${RANK_CHARS[pairRank - 2]}`)
+  if (pairRank !== null && aces < 2) parts.push(`пара ${RANK_LABELS[pairRank - 2]}`)
   const desc = parts.length > 0
     ? parts.join(', ').replace(/^./, (ch) => ch.toUpperCase())
     : 'Разномастная некоординированная рука'

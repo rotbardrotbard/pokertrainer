@@ -7,6 +7,14 @@ export interface Card {
 export const SUIT_SYMBOLS = ['\u2660', '\u2665', '\u2666', '\u2663'] as const // ♠ ♥ ♦ ♣
 export const RANK_CHARS = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'] as const
 
+// Подписи рангов для интерфейса: вместо «T» показываем «10».
+export const RANK_LABELS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'] as const
+
+/** Нотация руки/карты для отображения: «T» → «10» (внутренние ключи и коды остаются на «T»). */
+export function labelNotation(notation: string): string {
+  return notation.replaceAll('T', '10')
+}
+
 export const RANK_NAMES_NOM: Record<number, string> = {
   14: 'туз', 13: 'король', 12: 'дама', 11: 'валет', 10: 'десятка',
   9: 'девятка', 8: 'восьмёрка', 7: 'семёрка', 6: 'шестёрка',
@@ -24,7 +32,7 @@ export const RANK_NAMES_RU: Record<number, string> = {
 }
 
 export function cardToString(c: Card): string {
-  return RANK_CHARS[c.r - 2] + SUIT_SYMBOLS[c.s]
+  return RANK_LABELS[c.r - 2] + SUIT_SYMBOLS[c.s]
 }
 
 export function cardToCode(c: Card): string {

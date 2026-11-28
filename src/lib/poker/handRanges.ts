@@ -1,7 +1,7 @@
 // Диапазоны стартовых рук оппонентов: Холдем (классы рук) и Омаха (эвристическая оценка).
 // Используется калькулятором эквити и GTO-чартами.
 // «Топ N%» — доля комбинаций от всех возможных стартовых рук.
-import { Card, RANK_CHARS } from './cards'
+import { Card, RANK_LABELS } from './cards'
 import { handClass, topPercentClasses } from './ranges'
 
 export type GameKind = 'holdem' | 'omaha4' | 'omaha5'
@@ -332,6 +332,6 @@ export function handToSymbols(hand: Card[]): string {
   return hand
     .slice()
     .sort((a, b) => b.r - a.r)
-    .map((c) => RANK_CHARS[c.r - 2] + ['♠', '♥', '♦', '♣'][c.s])
+    .map((c) => RANK_LABELS[c.r - 2] + ['♠', '♥', '♦', '♣'][c.s])
     .join(' ')
 }

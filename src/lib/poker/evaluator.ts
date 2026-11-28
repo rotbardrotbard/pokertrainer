@@ -1,7 +1,7 @@
 // Оценщик покерных комбинаций (Texas Hold'em).
 // Возвращает числовой score: category*15^5 + tiebreak-ранги (base 15).
 // Чем больше score, тем сильнее рука.
-import { Card, RANK_CHARS } from './cards'
+import { Card, RANK_LABELS } from './cards'
 
 export const HAND_CATEGORY_NAMES_RU = [
   'Старшая карта',
@@ -242,7 +242,7 @@ export function handName(result: HandResult): string {
   const cnt = new Map<number, number>()
   for (const r of ranks) cnt.set(r, (cnt.get(r) || 0) + 1)
   const groups = [...cnt.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])
-  const nom = (r: number) => (r === 14 ? 'туз' : r === 13 ? 'король' : r === 12 ? 'дама' : r === 11 ? 'валет' : RANK_CHARS[r - 2])
+  const nom = (r: number) => (r === 14 ? 'туз' : r === 13 ? 'король' : r === 12 ? 'дама' : r === 11 ? 'валет' : RANK_LABELS[r - 2])
   // родительный падеж единственного числа («до короля», «до дамы»)
   const genSg = (r: number) => {
     switch (r) {

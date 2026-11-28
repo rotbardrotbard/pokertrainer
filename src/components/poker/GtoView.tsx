@@ -17,7 +17,7 @@ import {
 import type { Street, TierPlan } from '@/lib/poker/gto'
 import type { Position } from '@/lib/poker/ranges'
 import { freqAggregate, freqLabel, mixExamples } from '@/lib/poker/ranges'
-import { parseCard } from '@/lib/poker/cards'
+import { parseCard, labelNotation } from '@/lib/poker/cards'
 import type { Card as PokerCard } from '@/lib/poker/cards'
 import { cn } from '@/lib/utils'
 
@@ -464,7 +464,7 @@ function PreflopHoldem({
             <div className="flex flex-wrap gap-1.5">
               {mixes.map((e) => (
                 <span key={e.cls} className="px-2 py-0.5 rounded text-[11px] font-normal bg-stone-800 text-stone-200">
-                  {e.cls}: {freqLabel(e.f)}
+                  {labelNotation(e.cls)}: {freqLabel(e.f)}
                 </span>
               ))}
             </div>

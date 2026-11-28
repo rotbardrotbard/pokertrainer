@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { TrainerShell, ScenarioCard } from './TrainerShell'
 import { PlayingCard, CardRow } from './PlayingCard'
-import { SUIT_SYMBOLS, RANK_CHARS } from '@/lib/poker/cards'
+import { SUIT_SYMBOLS, RANK_CHARS, RANK_LABELS } from '@/lib/poker/cards'
 import type { Card as PokerCard } from '@/lib/poker/cards'
 import { simulateEquity, recommendedIterations } from '@/lib/poker/equity'
 import { evaluate7, handCategoryName } from '@/lib/poker/evaluator'
@@ -262,7 +262,7 @@ export function CalculatorView({ onBack }: { onBack: () => void }) {
             <div key={s} className="flex gap-1">
               {RANK_CHARS.map((rc, ri) => {
                 const card: PokerCard = { r: ri + 2, s }
-                const code = RANK_CHARS[ri] + SUIT_SYMBOLS[s]
+                const code = RANK_LABELS[ri] + SUIT_SYMBOLS[s]
                 const used = usedCodes.has(RANK_CHARS[ri] + 'shdc'[s])
                 return (
                   <button
@@ -280,7 +280,7 @@ export function CalculatorView({ onBack }: { onBack: () => void }) {
                     )}
                     aria-label={`Выбрать ${code}`}
                   >
-                    {rc}{SUIT_SYMBOLS[s]}
+                    {RANK_LABELS[ri]}{SUIT_SYMBOLS[s]}
                   </button>
                 )
               })}

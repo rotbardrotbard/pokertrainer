@@ -3,6 +3,7 @@
 // Сетка 13×13 для просмотра диапазонов префлоп (с поддержкой смешанных частот GTO)
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
+import { labelNotation } from '@/lib/poker/cards'
 import type { ActionFreq } from '@/lib/poker/ranges'
 import { isMixed, freqShort, freqLabel } from '@/lib/poker/ranges'
 
@@ -40,6 +41,7 @@ export function RangeGrid({
         {RANKS.map((_, row) =>
           RANKS.map((__, col) => {
             const cls = classFor(row, col)
+            const label = labelNotation(cls)
             const action = getAction(cls)
             const freq = getFreq?.(cls)
             const mixed = freq ? isMixed(freq) : false
@@ -54,10 +56,10 @@ export function RangeGrid({
                   actionStyles[action],
                   selected === cls && 'ring-2 ring-white z-10',
                 )}
-                title={mixed && freq ? `${cls}: ${freqLabel(freq)}` : `${cls}: ${actionLabel(action)}`}
-                aria-label={mixed && freq ? `${cls}: ${freqLabel(freq)}` : `${cls}: ${actionLabel(action)}`}
+                title={mixed && freq ? `${label}: ${freqLabel(freq)}` : `${label}: ${actionLabel(action)}`}
+                aria-label={mixed && freq ? `${label}: ${freqLabel(freq)}` : `${label}: ${actionLabel(action)}`}
               >
-                <span className={mixed ? 'mt-0.5' : ''}>{cls}</span>
+                <span className={mixed ? 'mt-0.5' : ''} style={label.length > 3 ? { fontSize: '0.8em' } : undefined}>{label}</span>
                 {mixed && freq && (
                   <span className="text-[8px] opacity-80 leading-none">{freqShort(freq)}</span>
                 )}
@@ -70,11 +72,11 @@ export function RangeGrid({
         {selected ? (
           selectedMixed && selectedFreq ? (
             <span>
-              <span className="font-normal text-stone-100">{selected}</span> — {freqLabel(selectedFreq)}
+              <span className="font-normal text-stone-100">{labelNotation(selected)}</span> — {freqLabel(selectedFreq)}
             </span>
           ) : (
             <span>
-              <span className="font-normal text-stone-100">{selected}</span> — {actionLabel(getAction(selected))}
+              <span className="font-normal text-stone-100">{labelNotation(selected)}</span> — {actionLabel(getAction(selected))}
             </span>
           )
         ) : (

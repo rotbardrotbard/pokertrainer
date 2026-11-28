@@ -10,6 +10,7 @@ import type { Position, ActionFreq } from './ranges'
 import { omahaRangeThreshold, omahaHandPercentile, handInRange, HOLE_COUNT } from './handRanges'
 import type { GameKind } from './handRanges'
 import type { Card } from './cards'
+import { labelNotation } from './cards'
 
 export type Street = 'preflop' | 'flop' | 'turn' | 'river'
 
@@ -787,7 +788,7 @@ export function preflopNotes(game: GameKind, pos: Position, situation: 'open' | 
         notes.push(`Против открытия с ${rp} за столом ${players}-max: соотношение действий по частотам — 3бет ${agg.raise.toFixed(0)}% / колл ${agg.call.toFixed(0)}% / фолд ${agg.fold.toFixed(0)}% всех рук.`)
         const ex = mixExamples(freq, 2)
         if (ex.length > 0) {
-          notes.push(`Пограничные руки играются смешанно: ${ex.map((e) => `${e.cls} — ${freqLabel(e.f)}`).join(' · ')}.`)
+          notes.push(`Пограничные руки играются смешанно: ${ex.map((e) => `${labelNotation(e.cls)} — ${freqLabel(e.f)}`).join(' · ')}.`)
         }
       } else {
         notes.push(`Против открытия с ${rp} за столом ${players}-max: 3бет ≈ топ ${chart.raisePct.toFixed(0)}% рук, колл ≈ топ ${chart.callPct.toFixed(0)}%.`)

@@ -1,7 +1,7 @@
 'use client'
 
 // Игральная карта (визуальная)
-import { Card, SUIT_SYMBOLS, RANK_CHARS } from '@/lib/poker/cards'
+import { Card, SUIT_SYMBOLS, RANK_LABELS } from '@/lib/poker/cards'
 import { cn } from '@/lib/utils'
 
 interface PlayingCardProps {
@@ -54,11 +54,11 @@ export function PlayingCard({ card, faceDown, size = 'md', highlighted, dimmed, 
         dimmed && 'opacity-40',
         className,
       )}
-      aria-label={`${RANK_CHARS[card.r - 2]} ${SUIT_SYMBOLS[card.s]}`}
+      aria-label={`${RANK_LABELS[card.r - 2]} ${SUIT_SYMBOLS[card.s]}`}
     >
-      <span className="absolute top-0.5 left-1 font-bold leading-none">{RANK_CHARS[card.r - 2]}</span>
+      <span className="absolute top-0.5 left-1 font-bold leading-none">{RANK_LABELS[card.r - 2]}</span>
       <span className={cn('leading-none', suitSizes[size])}>{SUIT_SYMBOLS[card.s]}</span>
-      <span className="absolute bottom-0.5 right-1 font-bold leading-none rotate-180">{RANK_CHARS[card.r - 2]}</span>
+      <span className="absolute bottom-0.5 right-1 font-bold leading-none rotate-180">{RANK_LABELS[card.r - 2]}</span>
     </div>
   )
 }
