@@ -4,6 +4,7 @@ import { evaluate5, handName } from '../src/lib/poker/evaluator'
 import { bestOmahaHand } from '../src/lib/poker/omaha'
 import {
   bestOmahaScoreFast, simulateOmahaDouble, analyzePloHand, genOmahaSimScenario, genOmahaSimExam,
+  advanceOmahaSimStreet,
 } from '../src/lib/poker/omahaSim'
 import { omahaPreflop, omahaAction, omahaActionFreqs, omahaEquityTier } from '../src/lib/poker/gto'
 import { dominantAction, isMixed } from '../src/lib/poker/ranges'
@@ -169,8 +170,6 @@ function hasDuplicates(cards: Card[]): boolean {
 
 {
   let flopN = 0
-  let turnN = 0
-  let riverN = 0
   for (let t = 0; t < 60; t++) {
     for (const hc of [4, 5] as const) {
       const s = genOmahaSimScenario(hc)
@@ -180,18 +179,22 @@ function hasDuplicates(cards: Card[]): boolean {
         assert(s.sim !== null && s.heroHands !== null && s.heroBest !== null, 'postflop fields')
         assert(s.chart === null && s.handPct === null, 'postflop no chart')
         assert(s.gtoHint !== null && s.gtoHint.length > 0, 'postflop gtoHint')
-        // обе доски на одной улице: открываются синхронно (2 флопа → 2 терна → 2 ривера)
+        // тренировка начинается с двух флопов: доски синхронны, полные доски сданы заранее
         assert(
-          s.boards![0].length === s.boards![1].length && s.boards![0].length >= 3 && s.boards![0].length <= 5,
-          `boards same street #${t}: ${s.boards![0].length} vs ${s.boards![1].length}`,
+          s.boards![0].length === 3 && s.boards![1].length === 3,
+          `training postflop starts at flop #${t}: ${s.boards![0].length}/${s.boards![1].length}`,
         )
+        assert(
+          s.fullBoards !== undefined && s.fullBoards !== null
+          && s.fullBoards![0].length === 5 && s.fullBoards![1].length === 5,
+          `fullBoards 5+5 #${t}`,
+        )
+        // стартовые доски — префиксы полных
+        const pref = (full: Card[], seen: Card[]) => seen.every((c, i) => full[i].r === c.r && full[i].s === c.s)
+        assert(pref(s.fullBoards![0], s.boards![0]) && pref(s.fullBoards![1], s.boards![1]), `flop is prefix of fullBoards #${t}`)
         // подпись улицы в промпте соответствует длине досок
-        const nCards = s.boards![0].length
-        const streetWord = nCards === 3 ? 'флоп.' : nCards === 4 ? 'терн.' : 'ривер.'
-        assert(s.prompt.startsWith(streetWord), `street label matches board size #${t}: ${s.prompt.slice(0, 12)}`)
-        if (nCards === 3) flopN++
-        else if (nCards === 4) turnN++
-        else riverN++
+        assert(s.prompt.startsWith('Флоп.'), `street label matches board size #${t}: ${s.prompt.slice(0, 12)}`)
+        flopN++
         // названия комбинаций пересчитываем независимо
         const n1 = handName(bestOmahaHand(s.hero, s.boards![0]))
         const n2 = handName(bestOmahaHand(s.hero, s.boards![1]))
@@ -239,9 +242,8 @@ function hasDuplicates(cards: Card[]): boolean {
       assert(!hasDuplicates(s.hero), 'hero cards unique')
     }
   }
-  // все три улицы генерируются (120 сценариев: постфлоп ~45%, ривер ~25% постфлопов)
-  console.log(`Улицы постфлопа: флоп ${flopN}, терн ${turnN}, ривер ${riverN} (из 120 сценариев)`)
-  assert(flopN > 0 && turnN > 0 && riverN > 0, 'all streets generated (flop/turn/river)')
+  console.log(`Постфлоп-раздачи начинаются с двух флопов: ${flopN} из 120 сценариев`)
+  assert(flopN > 0, 'postflop scenarios generated')
 }
 
 // ---------- 5b. omahaHandPercentile: место руки «топ X%» ----------
@@ -339,6 +341,59 @@ function hasDuplicates(cards: Card[]): boolean {
   }
   assert(firsts.size > 1, `exam order shuffled, first kinds: ${[...firsts].join(',')}`)
   console.log(`Экзамен: состав 5/10/20 для 4-card и 5-card корректен; первый вопрос варьируется (${firsts.size} варианта)`)
+}
+
+// ---------- 5e. advanceOmahaSimStreet: синхронное открытие улиц ----------
+{
+  const samePrefix = (b: Card[], bb: Card[]) => bb.slice(0, b.length).every((c, i) => c.r === b[i].r && c.s === b[i].s)
+  for (const hc of [4, 5] as const) {
+    let advanced = 0
+    for (let t = 0; t < 60 && advanced < 20; t++) {
+      const s0 = genOmahaSimScenario(hc)
+      if (s0.kind !== 'postflop') continue
+      advanced++
+      let s = s0
+      let street = 3
+      while (street < 5) {
+        const prev = s
+        s = advanceOmahaSimStreet(s)
+        street++
+        assert(s.boardStreet === street, `advance to street ${street}`)
+        assert(
+          s.boards![0].length === street && s.boards![1].length === street,
+          `both boards grow to ${street}: ${s.boards![0].length}/${s.boards![1].length}`,
+        )
+        // доски — стабильные префиксы: старые карты не меняются, новые добавляются синхронно
+        assert(samePrefix(prev.boards![0], s.boards![0]) && samePrefix(prev.boards![1], s.boards![1]), `prefix stable ${street}`)
+        assert(samePrefix(s.fullBoards![0].slice(0, street), s.boards![0]), `boards == fullBoards[0] prefix ${street}`)
+        assert(samePrefix(s.fullBoards![1].slice(0, street), s.boards![1]), `boards == fullBoards[1] prefix ${street}`)
+        // банк вырос на ставку и колл предыдущей улицы; ставка в пределах стека
+        assert(s.pot === prev.pot + 2 * prev.bet, `pot grows: ${s.pot} vs ${prev.pot + 2 * prev.bet}`)
+        assert(s.bet >= 1 && s.bet <= s.stack, `bet within stack: ${s.bet}`)
+        assert(!hasDuplicates([...s.hero, ...s.boards![0], ...s.boards![1]]), `no dup street ${street}`)
+        // решение согласовано с эквити и промптом улицы
+        const req = s.bet / (s.pot + 2 * s.bet)
+        const expected: 'fold' | 'call' | 'raise' = s.sim!.total >= req + 0.14 ? 'raise' : s.sim!.total >= req + 0.01 ? 'call' : 'fold'
+        assert(s.correctAction === expected, `action match street ${street}`)
+        const w = street === 3 ? 'Флоп.' : street === 4 ? 'Терн.' : 'Ривер.'
+        assert(s.prompt.startsWith(w), `prompt street label ${street}: ${s.prompt.slice(0, 10)}`)
+        assert(s.heroHands !== null && s.heroBest !== null, `combo fields street ${street}`)
+      }
+      // на ривере advance — no-op
+      const frozen = advanceOmahaSimStreet(s)
+      assert(frozen === s, 'advance at river is a no-op')
+    }
+    assert(advanced >= 10, `enough postflop scenarios for ${hc}-card, got ${advanced}`)
+    console.log(`advanceOmahaSimStreet (${hc}-card): ${advanced} раздач доиграны до ривера, доски синхронны`)
+  }
+  // префлоп-сценарии advance не трогает
+  let preflopSeen = 0
+  for (let t = 0; t < 40 && preflopSeen < 10; t++) {
+    const s = genOmahaSimScenario(4)
+    if (s.kind === 'postflop') continue
+    preflopSeen++
+    assert(advanceOmahaSimStreet(s) === s, 'advance preflop no-op')
+  }
 }
 
 // ---------- 6. Производительность ----------

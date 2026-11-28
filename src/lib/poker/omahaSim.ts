@@ -318,8 +318,9 @@ export interface OmahaSimScenario {
   holeCount: 4 | 5
   kind: OmahaSimKind
   hero: Card[]
-  boards: [Card[], Card[]] | null // только postflop
+  boards: [Card[], Card[]] | null // только postflop: вид досок на текущей улице
   boardStreet: number // общая улица постфлопа: длина ОБЕИХ досок (3=флоп, 4=терн, 5=ривер); доски открываются синхронно
+  fullBoards?: [Card[], Card[]] | null // полные доски по 5 карт: раздача доигрывается с флопа до ривера
   position: Position
   players: number // размер стола (влияет на ширину диапазона)
   raiser?: Position // позиция рейзера (для сценария vsRaise)
@@ -499,13 +500,99 @@ function genVsRaiseScenario(holeCount: 4 | 5): OmahaSimScenario {
 }
 
 // --- Постфлоп: решение против ставки на двух досках ---
+//
+// Раздача играется целиком: доски сдаются заранее (5 + 5 карт) и открываются
+// синхронно — сначала два флопа, затем два терна и два ривера. На каждой улице
+// оппонент ставит, герой отвечает; решение оценивается по эквити на этой улице.
 
-function genPostflopScenario(holeCount: 4 | 5, forceStreet?: 3 | 4 | 5): OmahaSimScenario {
-  const pot = pick([30, 40, 60, 80])
-  const betMult = pick([0.5, 0.75, 1])
-  const bet = Math.round(pot * betMult)
+function streetRu(n: number): string {
+  return n === 3 ? 'флоп' : n === 4 ? 'терн' : 'ривер'
+}
+
+/** Сценарий постфлопа на заданной улице для уже сданной раздачи. */
+function buildPostflopStreet(
+  hero: Card[],
+  fullBoards: [Card[], Card[]],
+  holeCount: 4 | 5,
+  street: 3 | 4 | 5,
+  pot: number,
+  bet: number,
+): OmahaSimScenario {
+  const b1 = fullBoards[0].slice(0, street)
+  const b2 = fullBoards[1].slice(0, street)
+  const sim = simulateOmahaDouble({ hero, boards: [b1, b2], holeCount, iterations: 600 })
+  const totalPct = sim.total * 100
   const required = bet / (pot + 2 * bet)
   const requiredPct = Math.round(required * 1000) / 10
+  const heroHands: [string, string] = [
+    handName(bestOmahaHand(hero, b1)),
+    handName(bestOmahaHand(hero, b2)),
+  ]
+  const heroBest: [Card[], Card[]] = [
+    bestOmahaHand(hero, b1).best,
+    bestOmahaHand(hero, b2).best,
+  ]
+  let correct: OmahaSimAction
+  if (sim.total >= required + 0.14) correct = 'raise'
+  else if (sim.total >= required + 0.01) correct = 'call'
+  else correct = 'fold'
+  const verdict = correct === 'raise'
+    ? 'рейз для вэлью — эквити сильно выше требуемого'
+    : correct === 'call'
+      ? 'колл прибылен — эквити выше требуемых пот-оддсов'
+      : 'фолд — колл теряет деньги'
+  // GTO-ориентир по общей улице
+  const gtoStreet: 'flop' | 'turn' | 'river' = street === 3 ? 'flop' : street === 4 ? 'turn' : 'river'
+  const tier = omahaEquityTier(gameOf(holeCount), gtoStreet, correct)
+  const sRu = streetRu(street)
+  return {
+    holeCount,
+    kind: 'postflop',
+    hero,
+    boards: [b1, b2],
+    boardStreet: street,
+    fullBoards,
+    position: 'BB',
+    players: 6,
+    chart: null,
+    handPct: null,
+    gtoHint: `${tier.tier} — против ставки: ${tier.facingBet.toLowerCase()}`,
+    prompt: `${cap(sRu)}. Оппонент ставит ${bet} bb в банк ${pot} bb на обе доски. Ваше действие?`,
+    actionLabels: { fold: 'Фолд', call: `Колл ${bet} bb`, raise: `Рейз до ${Math.round(bet * 2.5)} bb` },
+    correctAction: correct,
+    pot,
+    bet,
+    stack: 100,
+    profile: analyzePloHand(hero),
+    sim,
+    requiredPct,
+    heroHands,
+    heroBest,
+    explanation:
+      `Эквити по банку ${totalPct.toFixed(1)}% (Доска 1: ${(sim.eq1 * 100).toFixed(0)}%, Доска 2: ${(sim.eq2 * 100).toFixed(0)}%) ` +
+      `против случайной руки при требуемых ${requiredPct}% — ${verdict}.`,
+    detail: [
+      'На каждой доске разыгрывается половина банка: итоговое эквити — среднее по двум доскам.',
+      'Эквити считается против случайной руки оппонента: против реального диапазона бэттера оно ниже — решение может отличаться (чаще фолд).',
+      'Доски открываются синхронно: сначала два флопа, затем два терна и два ривера.',
+      `Доска 1 (${sRu}) — ваша лучшая комбинация: ${heroHands[0]}.`,
+      `Доска 2 (${sRu}) — ваша лучшая комбинация: ${heroHands[1]}.`,
+      `Пот-оддсы: ${bet} / (${pot} + ${bet} + ${bet}) = ${requiredPct}%.`,
+      `GTO-чарт (${sRu}): ${tier.tier} — против ставки: ${tier.facingBet.toLowerCase()}.`,
+      'В Омахе комбинация — ровно 2 карты руки + 3 с доски, подсветка показывает их.',
+    ],
+  }
+}
+
+function cap(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+/** Стартовая раздача постфлопа: выбор самой «интересной» из нескольких по эквити флопа. */
+function genPostflopScenario(holeCount: 4 | 5, forceStreet?: 3 | 4 | 5): OmahaSimScenario {
+  const pot0 = pick([30, 40, 60, 80])
+  const betMult = pick([0.5, 0.75, 1])
+  const bet0 = Math.round(pot0 * betMult)
 
   // выбираем самую «интересную» из нескольких раздач: эквити ближе к границе решения
   let best: OmahaSimScenario | null = null
@@ -513,80 +600,38 @@ function genPostflopScenario(holeCount: 4 | 5, forceStreet?: 3 | 4 | 5): OmahaSi
   for (let t = 0; t < 4; t++) {
     const deck = shuffled()
     const hero = deck.slice(0, holeCount)
-    // Обе доски на одной улице: 2 флопа → 2 терна → 2 ривера (синхронно)
-    // forceStreet — для режима экзамена (фиксированная улица вопроса)
-    const n = forceStreet ?? pick([3, 3, 4, 5])
-    const b1 = deck.slice(holeCount, holeCount + n)
-    const b2 = deck.slice(holeCount + n, holeCount + 2 * n)
-    const sim = simulateOmahaDouble({ hero, boards: [b1, b2], holeCount, iterations: 600 })
-    const totalPct = sim.total * 100
-    const street = n === 3 ? 'флоп' : n === 4 ? 'терн' : 'ривер'
-    const heroHands: [string, string] = [
-      handName(bestOmahaHand(hero, b1)),
-      handName(bestOmahaHand(hero, b2)),
+    // Полные доски по 5 карт: открываются синхронно по улицам
+    const fullBoards: [Card[], Card[]] = [
+      deck.slice(holeCount, holeCount + 5),
+      deck.slice(holeCount + 5, holeCount + 10),
     ]
-    const heroBest: [Card[], Card[]] = [
-      bestOmahaHand(hero, b1).best,
-      bestOmahaHand(hero, b2).best,
-    ]
-    let correct: OmahaSimAction
-    if (sim.total >= required + 0.14) correct = 'raise'
-    else if (sim.total >= required + 0.01) correct = 'call'
-    else correct = 'fold'
-    const verdict = correct === 'raise'
-      ? 'рейз для вэлью — эквити сильно выше требуемого'
-      : correct === 'call'
-        ? 'колл прибылен — эквити выше требуемых пот-оддсов'
-        : 'фолд — колл теряет деньги'
-    const streetLabel = street
-    // GTO-ориентир по общей улице
-    const gtoStreet: 'flop' | 'turn' | 'river' = n === 3 ? 'flop' : n === 4 ? 'turn' : 'river'
-    const tier = omahaEquityTier(gameOf(holeCount), gtoStreet, correct)
-    const scenario: OmahaSimScenario = {
-      holeCount,
-      kind: 'postflop',
-      hero,
-      boards: [b1, b2],
-      boardStreet: n,
-      position: 'BB',
-      players: 6,
-      chart: null,
-      handPct: null,
-      gtoHint: `${tier.tier} — против ставки: ${tier.facingBet.toLowerCase()}`,
-      prompt: `${streetLabel}. Оппонент ставит ${bet} bb в банк ${pot} bb на обе доски. Ваше действие?`,
-      actionLabels: { fold: 'Фолд', call: `Колл ${bet} bb`, raise: `Рейз до ${Math.round(bet * 2.5)} bb` },
-      correctAction: correct,
-      pot,
-      bet,
-      stack: 100,
-      profile: analyzePloHand(hero),
-      sim,
-      requiredPct,
-      heroHands,
-      heroBest,
-      explanation:
-        `Эквити по банку ${totalPct.toFixed(1)}% (Доска 1: ${(sim.eq1 * 100).toFixed(0)}%, Доска 2: ${(sim.eq2 * 100).toFixed(0)}%) ` +
-        `против случайной руки при требуемых ${requiredPct}% — ${verdict}.`,
-      detail: [
-        'На каждой доске разыгрывается половина банка: итоговое эквити — среднее по двум доскам.',
-        'Эквити считается против случайной руки оппонента: против реального диапазона бэттера оно ниже — решение может отличаться (чаще фолд).',
-        'Доски открываются синхронно: сначала два флопа, затем два терна и два ривера.',
-        `Доска 1 (${street}) — ваша лучшая комбинация: ${heroHands[0]}.`,
-        `Доска 2 (${street}) — ваша лучшая комбинация: ${heroHands[1]}.`,
-        `Пот-оддсы: ${bet} / (${pot} + ${bet} + ${bet}) = ${requiredPct}%.`,
-        `GTO-чарт (${street}): ${tier.tier} — против ставки: ${tier.facingBet.toLowerCase()}.`,
-        'В Омахе комбинация — ровно 2 карты руки + 3 с доски, подсветка показывает их.',
-      ],
-    }
+    // Тренировка всегда начинается с двух флопов; экзамен может зафиксировать улицу
+    const street = forceStreet ?? 3
+    const scenario = buildPostflopStreet(hero, fullBoards, holeCount, street, pot0, bet0)
     // интерес: эквити близко к границе решения, разброс между досками добавляет обучательности
-    const spread = Math.abs(sim.eq1 - sim.eq2)
-    const interest = -Math.abs(sim.total - (required + 0.05)) + spread * 0.25 + Math.random() * 0.04
+    const spread = Math.abs(scenario.sim!.eq1 - scenario.sim!.eq2)
+    const interest = -Math.abs(scenario.sim!.total - (scenario.requiredPct! / 100 + 0.05)) + spread * 0.25 + Math.random() * 0.04
     if (interest > bestInterest) {
       bestInterest = interest
       best = scenario
     }
   }
   return best!
+}
+
+/**
+ * Следующая улица раздачи: обе доски открываются синхронно (терн/ривер).
+ * Банк растёт на ставку и колл предыдущей улицы; ставка пересчитывается,
+ * эквити и верное решение переоцениваются по новым доскам.
+ */
+export function advanceOmahaSimStreet(sc: OmahaSimScenario): OmahaSimScenario {
+  if (sc.kind !== 'postflop' || !sc.fullBoards || sc.boardStreet >= 5) return sc
+  const nextStreet = (sc.boardStreet + 1) as 3 | 4 | 5
+  const pot = sc.pot + 2 * sc.bet
+  const betMult = pick([0.5, 0.75])
+  // ставка не превышает стек
+  const bet = Math.max(1, Math.min(Math.round(pot * betMult), sc.stack))
+  return buildPostflopStreet(sc.hero, sc.fullBoards, sc.holeCount, nextStreet, pot, bet)
 }
 
 export function genOmahaSimScenario(holeCount: 4 | 5): OmahaSimScenario {

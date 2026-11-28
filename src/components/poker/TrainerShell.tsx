@@ -65,9 +65,11 @@ export interface FeedbackProps {
   detail?: string[]
   onNext: () => void
   nextLabel?: string
+  /** Второе действие (например, «новая раздача» при продолжении текущей) */
+  secondary?: { label: string; onClick: () => void }
 }
 
-export function Feedback({ correct, headline, explanation, detail, onNext, nextLabel = 'Далее' }: FeedbackProps) {
+export function Feedback({ correct, headline, explanation, detail, onNext, nextLabel = 'Далее', secondary }: FeedbackProps) {
   return (
     <Card className={cn(
       'border-2',
@@ -84,9 +86,24 @@ export function Feedback({ correct, headline, explanation, detail, onNext, nextL
             {detail.map((d, i) => <li key={i}>{d}</li>)}
           </ul>
         )}
-        <Button onClick={onNext} className="bg-emerald-600 text-white hover:bg-emerald-500 mt-1">
-          <RotateCcw className="w-4 h-4" /> {nextLabel}
-        </Button>
+        {secondary ? (
+          <div className="flex flex-col sm:flex-row gap-2 mt-1">
+            <Button onClick={onNext} className="bg-emerald-600 text-white hover:bg-emerald-500 flex-1">
+              <RotateCcw className="w-4 h-4" /> {nextLabel}
+            </Button>
+            <Button
+              onClick={secondary.onClick}
+              variant="outline"
+              className="border-stone-600 bg-stone-800/60 text-stone-200 hover:bg-stone-700 hover:text-white flex-1"
+            >
+              {secondary.label}
+            </Button>
+          </div>
+        ) : (
+          <Button onClick={onNext} className="bg-emerald-600 text-white hover:bg-emerald-500 mt-1">
+            <RotateCcw className="w-4 h-4" /> {nextLabel}
+          </Button>
+        )}
       </CardContent>
     </Card>
   )

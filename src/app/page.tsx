@@ -25,6 +25,8 @@ import type { GtoInitial } from '@/components/poker/GtoView'
 export default function Home() {
   const [view, setView] = useState<ViewId>('home')
   const [gtoInit, setGtoInit] = useState<GtoInitial | null>(null)
+  // открытая категория на главной: сохраняется при возврате из режима в меню
+  const [openCat, setOpenCat] = useState<string | null>(null)
 
   // прокрутка вверх при смене экрана
   useEffect(() => {
@@ -83,6 +85,6 @@ export default function Home() {
     case 'donate':
       return <DonateView onBack={back} />
     default:
-      return <HomeView onSelect={setView} />
+      return <HomeView onSelect={setView} openCat={openCat} onOpenCat={setOpenCat} />
   }
 }

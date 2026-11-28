@@ -11,6 +11,7 @@ import { PlayingCard } from './PlayingCard'
 import { LiveHand, LIVE_GAME_NAMES_RU, LIVE_GAME_HINTS, MAX_BOTS } from '@/lib/poker/live'
 import type { LiveGame, LiveSnapshot, SeatView, DecisionRec } from '@/lib/poker/live'
 import { useLiveStats } from '@/store/liveStats'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 
 type ModeSel = 'mix' | 'full' | 'node'
@@ -28,13 +29,31 @@ function accuracy(correct: number, decisions: number): string {
   return `${Math.round((correct / decisions) * 100)}%`
 }
 
-/** Позиция места на овальном столе: герой всегда снизу по центру. */
-function seatPos(idx: number, heroIdx: number, n: number): { left: string; top: string } {
+/**
+ * Фиксированные слоты мест: герой снизу по центру, соперники — дугой без нижнего сектора.
+ * align 'l'/'r' — коробка смещена к центру стола, чтобы у левого/правого края экрана
+ * место не обрезалось на мобильных.
+ */
+type SeatAlign = 'c' | 'l' | 'r'
+interface SeatSlot { x: number; y: number; a: SeatAlign }
+
+const OPP_SLOTS: SeatSlot[][] = [
+  /* 1 соперник */ [{ x: 50, y: 12, a: 'c' }],
+  /* 2 */ [{ x: 8, y: 40, a: 'l' }, { x: 92, y: 40, a: 'r' }],
+  /* 3 */ [{ x: 8, y: 40, a: 'l' }, { x: 50, y: 11, a: 'c' }, { x: 92, y: 40, a: 'r' }],
+  /* 4 */ [{ x: 8, y: 40, a: 'l' }, { x: 20, y: 13, a: 'c' }, { x: 80, y: 13, a: 'c' }, { x: 92, y: 40, a: 'r' }],
+  /* 5 */ [{ x: 8, y: 40, a: 'l' }, { x: 18, y: 13, a: 'c' }, { x: 50, y: 10, a: 'c' }, { x: 82, y: 13, a: 'c' }, { x: 92, y: 40, a: 'r' }],
+  /* 6 */ [{ x: 9, y: 67, a: 'l' }, { x: 8, y: 36, a: 'l' }, { x: 20, y: 12, a: 'c' }, { x: 80, y: 12, a: 'c' }, { x: 92, y: 36, a: 'r' }, { x: 91, y: 67, a: 'r' }],
+  /* 7 */ [{ x: 9, y: 67, a: 'l' }, { x: 8, y: 36, a: 'l' }, { x: 18, y: 12, a: 'c' }, { x: 50, y: 9, a: 'c' }, { x: 82, y: 12, a: 'c' }, { x: 92, y: 36, a: 'r' }, { x: 91, y: 67, a: 'r' }],
+  /* 8 */ [{ x: 10, y: 67, a: 'l' }, { x: 7, y: 36, a: 'l' }, { x: 17, y: 14, a: 'c' }, { x: 39, y: 9, a: 'c' }, { x: 61, y: 9, a: 'c' }, { x: 83, y: 14, a: 'c' }, { x: 93, y: 36, a: 'r' }, { x: 90, y: 67, a: 'r' }],
+]
+
+const HERO_SLOT: SeatSlot = { x: 50, y: 86, a: 'c' }
+
+function seatPos(idx: number, heroIdx: number, n: number): SeatSlot {
   const d = (idx - heroIdx + n) % n
-  const angle = ((90 + (d * 360) / n) * Math.PI) / 180
-  const x = 50 + 39 * Math.cos(angle)
-  const y = 44 + 29 * Math.sin(angle)
-  return { left: `${x}%`, top: `${y}%` }
+  if (d === 0) return HERO_SLOT
+  return OPP_SLOTS[n - 2][d - 1] // n ≥ 2: стол от 2 игроков
 }
 
 export function LiveGameView({ onBack }: { onBack: () => void }) {
@@ -46,6 +65,7 @@ export function LiveGameView({ onBack }: { onBack: () => void }) {
   const recordedRef = useRef<LiveHand | null>(null)
   const [, setTick] = useState(0)
   const stats = useLiveStats()
+  const isMobile = useIsMobile()
 
   const startHand = () => {
     const mode = modeSel === 'mix' ? (Math.random() < 0.5 ? 'full' : 'node') : modeSel
@@ -236,6 +256,8 @@ export function LiveGameView({ onBack }: { onBack: () => void }) {
   if (!hand) return null
   const snap: LiveSnapshot = hand.snapshot()
   const twoBoards = snap.boards.length > 1
+  // на мобильных двойной борд сжимаем карты, чтобы два ряда умещались без наложений
+  const boardCardSize: 'xs' | 'sm' = isMobile && twoBoards ? 'xs' : 'sm'
 
   return (
     <div className="w-full max-w-3xl mx-auto px-4 pb-10 pt-4 flex flex-col gap-3">
@@ -254,28 +276,30 @@ export function LiveGameView({ onBack }: { onBack: () => void }) {
       </div>
 
       {/* Стол */}
-      <div className="relative w-full h-[430px] sm:h-[460px]">
-        <div className="absolute inset-x-[6%] inset-y-[16%] rounded-[50%] border-2 border-emerald-900/70 bg-gradient-to-b from-neutral-800/80 to-neutral-900/90 shadow-inner" />
+      <div className="relative w-full h-[520px] sm:h-[500px]">
+        <div className="absolute inset-x-[4%] inset-y-[12%] rounded-[50%] border-2 border-emerald-900/70 bg-gradient-to-b from-neutral-800/80 to-neutral-900/90 shadow-inner" />
         {/* центр: банк и доски */}
-        <div className="absolute left-1/2 top-[42%] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-1.5 z-10">
+        <div className="absolute left-1/2 top-[36%] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-1.5 z-10">
           <div className="px-3 py-1 rounded-full bg-stone-900/90 border border-stone-700 text-xs text-stone-200">
             Банк: {snap.pot} bb · <span className="text-stone-400">{snap.streetLabel}</span>
           </div>
           {snap.boards.map((b, bi) => (
-            <div key={bi} className="flex items-center gap-1.5">
-              {twoBoards && <span className="text-[10px] text-stone-500 w-11 text-right">Доска {bi + 1}</span>}
-              {Array.from({ length: 5 }, (_, k) =>
-                b[k]
-                  ? <PlayingCard key={k} card={b[k]} size="sm" />
-                  : <PlayingCard key={k} faceDown size="sm" className="opacity-25" />,
-              )}
+            <div key={bi} className="flex flex-col items-center gap-0.5">
+              {twoBoards && <span className="text-[9px] leading-none text-stone-500">Доска {bi + 1}</span>}
+              <div className="flex items-center gap-1.5">
+                {Array.from({ length: 5 }, (_, k) =>
+                  b[k]
+                    ? <PlayingCard key={k} card={b[k]} size={boardCardSize} />
+                    : <PlayingCard key={k} faceDown size={boardCardSize} className="opacity-25" />,
+                )}
+              </div>
             </div>
           ))}
         </div>
 
         {/* места */}
         {snap.seats.map((s: SeatView) => (
-          <Seat key={s.idx} seat={s} pos={seatPos(s.idx, snap.heroSeat, snap.seats.length)} isButton={s.idx === snap.buttonIdx} />
+          <Seat key={s.idx} seat={s} slot={seatPos(s.idx, snap.heroSeat, snap.seats.length)} isButton={s.idx === snap.buttonIdx} />
         ))}
       </div>
 
@@ -351,40 +375,31 @@ export function LiveGameView({ onBack }: { onBack: () => void }) {
 
 // ===== Место за столом =====
 
-function Seat({ seat, pos, isButton }: { seat: SeatView; pos: { left: string; top: string }; isButton: boolean }) {
+function Seat({ seat, slot, isButton }: { seat: SeatView; slot: SeatSlot; isButton: boolean }) {
   const hero = seat.isHero
+  // боковые места смещены к центру стола, чтобы не обрезаться у края экрана
+  const translateX = slot.a === 'l' ? '-translate-x-[25%]' : slot.a === 'r' ? '-translate-x-[75%]' : '-translate-x-1/2'
   return (
     <div
-      className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-1 z-20"
-      style={{ left: pos.left, top: pos.top }}
+      className={cn('absolute -translate-y-1/2 flex flex-col items-center gap-1 z-20', translateX)}
+      style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
     >
       <div className={cn(
-        'px-2 py-1 rounded-lg border min-w-[76px] text-center',
+        'px-1.5 py-1 rounded-lg border text-center',
         hero
           ? 'border-emerald-500/60 bg-emerald-950/60'
           : seat.folded
             ? 'border-stone-800 bg-stone-900/70 opacity-45'
             : 'border-stone-700 bg-neutral-800/90',
       )}>
-        <p className={cn('text-[10px] leading-tight', hero ? 'text-emerald-300' : 'text-stone-300')}>
-          {seat.name}{isButton && <span className="ml-1 inline-flex w-4 h-4 rounded-full bg-stone-200 text-stone-900 text-[9px] items-center justify-center font-bold">D</span>}
+        <p className={cn('text-[10px] leading-tight whitespace-nowrap', hero ? 'text-emerald-300' : 'text-stone-300')}>
+          {seat.name}{isButton && <span className="ml-1 inline-flex w-4 h-4 rounded-full bg-stone-200 text-stone-900 text-[9px] items-center justify-center font-bold align-middle">D</span>}
         </p>
-        <p className="text-[9px] text-stone-500 leading-tight">{seat.seat} · {seat.stack} bb</p>
-        {/* карты */}
-        <div className={cn('flex justify-center', seat.cards.length > 2 && '-space-x-2.5', seat.cards.length === 2 && '-space-x-1', 'mt-1')}>
-          {seat.cards.map((c, k) => (
-            <PlayingCard
-              key={k}
-              card={c}
-              size="sm"
-              faceDown={!seat.faceUp}
-              dimmed={seat.folded}
-            />
-          ))}
-        </div>
+        <p className="text-[9px] text-stone-500 leading-tight">{seat.stack} bb</p>
+        <SeatCards seat={seat} />
         {seat.lastText && !seat.folded && (
           <p className={cn(
-            'mt-1 text-[9px] px-1 rounded bg-stone-800 border border-stone-700',
+            'mt-1 text-[9px] px-1 rounded bg-stone-800 border border-stone-700 whitespace-nowrap',
             seat.lastText.startsWith('Бет') || seat.lastText.startsWith('Рейз') ? 'text-emerald-400' : 'text-stone-300',
           )}>{seat.lastText}</p>
         )}
@@ -393,6 +408,30 @@ function Seat({ seat, pos, isButton }: { seat: SeatView; pos: { left: string; to
           <p className="mt-1 text-[9px] text-emerald-300/90 leading-tight max-w-[120px]">{seat.handLabel}</p>
         )}
       </div>
+    </div>
+  )
+}
+
+/** Карты места: у соперников до вскрытия — компактная стопка рубашек со счётчиком. */
+function SeatCards({ seat }: { seat: SeatView }) {
+  if (seat.cards.length === 0) return null
+  if (!seat.faceUp) {
+    return (
+      <div className="flex items-center justify-center mt-1">
+        <PlayingCard faceDown size="xs" dimmed={seat.folded} />
+        {seat.cards.length > 1 && (
+          <span className="ml-1 text-[9px] text-stone-400 bg-stone-800 border border-stone-700 rounded px-1 leading-snug">
+            ×{seat.cards.length}
+          </span>
+        )}
+      </div>
+    )
+  }
+  return (
+    <div className={cn('flex justify-center mt-1', seat.cards.length > 2 ? '-space-x-4' : '-space-x-0.5')}>
+      {seat.cards.map((c, k) => (
+        <PlayingCard key={k} card={c} size={seat.isHero ? 'sm' : 'xs'} dimmed={seat.folded} />
+      ))}
     </div>
   )
 }

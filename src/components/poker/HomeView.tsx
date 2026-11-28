@@ -1,7 +1,8 @@
 'use client'
 
-// Главная: режимы тренировки, статистика, серия дней
-import { Flame, Zap, Sigma, Target, Percent, Swords, Layers, Grid3x3, Calculator, Trophy, ShieldCheck, Spade, Copy, SquareStack, Shuffle, Dices, Compass, BookOpen, RotateCcw, CalendarDays, Medal, Users, Heart } from 'lucide-react'
+// Главная: категории режимов (клик по разделу открывает его наполнение),
+// статистика, серия дней, уровень.
+import { Flame, Zap, Sigma, Target, Percent, Swords, Layers, Grid3x3, Calculator, Trophy, ShieldCheck, Spade, Copy, SquareStack, Shuffle, Dices, Compass, BookOpen, RotateCcw, CalendarDays, Medal, Users, Heart, ArrowLeft, ChevronRight } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { TrainerId, useStats, accuracy, levelFor } from '@/store/stats'
@@ -20,25 +21,32 @@ interface ModeCard {
 }
 
 interface Category {
+  key: string
   title: string
+  blurb: string
   icon: typeof Zap
-  items: ModeCard[]
+  items?: ModeCard[] // без items — переход сразу к экрану (direct)
+  direct?: ViewId
 }
 
-const CATEGORIES: Category[] = [
+export const CATEGORIES: Category[] = [
   {
+    key: 'sims',
     title: 'Симуляторы',
+    blurb: 'Полные раздачи с решениями: Холдем и Омахи — на одной и двух досках',
     icon: Shuffle,
     items: [
       { id: 'sim', title: 'Симулятор Holdem', desc: 'Решения на префлопе и постфлопе с разбором', icon: Zap, trainer: 'sim' },
       { id: 'omahaSim', title: 'Симулятор Омаха', desc: 'Классическая 4-card Омаха: решения по GTO-чартам и эквити', icon: Dices, trainer: 'omahaSim' },
-      { id: 'omaha4sim', title: 'Симулятор 4-card Омаха (2 доски)', desc: 'Раздачи по GTO-чартам позиций: фолд, колл или рейз с разбором', icon: Copy, trainer: 'omaha4sim' },
-      { id: 'omaha5sim', title: 'Симулятор 5-card Омаха (2 доски)', desc: 'Диапазоны позиции и эквити двух досок с переходом в GTO', icon: SquareStack, trainer: 'omaha5sim' },
-      { id: 'live', title: 'Живая игра', desc: 'Визуальный стол 2–9 игроков: полные раздачи от префлопа до ривера — Холдэм и Омахи', icon: Users },
+      { id: 'omaha4sim', title: 'Симулятор 4-card Омаха (2 доски)', desc: 'Две доски открываются синхронно: флопы, терны и риверы — решение на каждой улице', icon: Copy, trainer: 'omaha4sim' },
+      { id: 'omaha5sim', title: 'Симулятор 5-card Омаха (2 доски)', desc: 'Пять карт руки на двух досках: раздача от флопа до ривера с разбором эквити', icon: SquareStack, trainer: 'omaha5sim' },
+      { id: 'live', title: 'Живая игра', desc: 'Визуальный стол 2–9 игроков: полные раздачи от префлопа до ривера — Холдем и Омахи', icon: Users },
     ],
   },
   {
+    key: 'trainers',
     title: 'Тренажеры',
+    blurb: 'Математика, аутсы, EV и чтение комбинаций — короткие упражнения',
     icon: Target,
     items: [
       { id: 'math', title: 'Математика', desc: 'Пот-оддсы, правило 2 и 4, MDF, SPR, комбинации и блефы', icon: Sigma, trainer: 'math' },
@@ -52,21 +60,23 @@ const CATEGORIES: Category[] = [
     ],
   },
   {
+    key: 'calculator',
     title: 'Калькулятор эквити',
+    blurb: 'Холдем и Омаха 4/5 карт: до 8 оппонентов и выбор диапазонов',
     icon: Calculator,
-    items: [
-      { id: 'calculator', title: 'Калькулятор эквити', desc: 'Холдем и Омаха 4/5 карт: до 8 оппонентов и выбор диапазонов', icon: Calculator },
-    ],
+    direct: 'calculator',
   },
   {
+    key: 'theory',
     title: 'Теория покера',
+    blurb: 'Справочник: аутсы, правило 2 и 4, пот-оддсы, EV, MDF и SPR — с примерами',
     icon: BookOpen,
-    items: [
-      { id: 'theory', title: 'Теория покера', desc: 'Аутсы, правило 2 и 4, пот-оддсы, EV, MDF и SPR — справочник с примерами', icon: BookOpen },
-    ],
+    direct: 'theory',
   },
   {
+    key: 'ranges',
     title: 'Диапазоны',
+    blurb: 'Чарты: что играть по позициям, а что сбрасывать',
     icon: Grid3x3,
     items: [
       { id: 'gto', title: 'GTO-чарты', desc: 'Стол, позиция, соперники и раунд: что играть, что сбрасывать', icon: Compass },
@@ -74,16 +84,56 @@ const CATEGORIES: Category[] = [
     ],
   },
   {
+    key: 'progress',
     title: 'Прогресс',
+    blurb: 'Календарь занятий, уровни XP и бейджи',
     icon: Medal,
     items: [
       { id: 'calendar', title: 'Календарь', desc: 'Статистика прохождения упражнений по дням: активность, точность, серии', icon: CalendarDays },
       { id: 'achievements', title: 'Достижения', desc: 'Уровни XP и бейджи: серии дней, дневные цели, экзамены', icon: Medal },
     ],
   },
+  {
+    key: 'donate',
+    title: 'Помочь проекту',
+    blurb: 'Поддержать разработку донатом на Boosty — проект остаётся бесплатным',
+    icon: Heart,
+    direct: 'donate',
+  },
 ]
 
-export function HomeView({ onSelect }: { onSelect: (v: ViewId) => void }) {
+/** Карточка одного режима (используется на внутренних страницах категорий). */
+function ModeCardButton({ m, onSelect }: { m: ModeCard; onSelect: (v: ViewId) => void }) {
+  const stats = useStats((s) => s.stats)
+  const Icon = m.icon
+  const acc = m.trainer ? accuracy(stats[m.trainer].correct, stats[m.trainer].attempts) : null
+  return (
+    <button type="button" onClick={() => onSelect(m.id)} className="text-left">
+      <Card className="border-stone-800 bg-gradient-to-br from-neutral-800/70 to-neutral-900/85 hover:from-neutral-700/75 hover:to-neutral-800/95 transition-all hover:border-emerald-500/40 h-full">
+        <CardContent className="p-4 flex items-start gap-3">
+          <div className="mt-0.5 w-10 h-10 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0">
+            <Icon className="w-5 h-5 text-emerald-400" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-normal text-stone-100 text-base sm:text-lg">{m.title}</h3>
+            <p className="text-xs text-stone-400 mt-0.5">{m.desc}</p>
+            {acc !== null && (
+              <p className={cn('text-xs mt-1.5 font-normal', acc >= 70 ? 'text-emerald-400' : 'text-stone-400')}>
+                Точность: {acc}%
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </button>
+  )
+}
+
+export function HomeView({ onSelect, openCat, onOpenCat }: {
+  onSelect: (v: ViewId) => void
+  openCat: string | null
+  onOpenCat: (key: string | null) => void
+}) {
   const stats = useStats((s) => s.stats)
   const streak = useStats((s) => s.streak)
   const bestStreak = useStats((s) => s.bestStreak)
@@ -98,6 +148,39 @@ export function HomeView({ onSelect }: { onSelect: (v: ViewId) => void }) {
   const demoHero = [parseCard('Ah')!, parseCard('Kh')!]
   const demoBoard = [parseCard('Qh')!, parseCard('Jh')!, parseCard('Ts')!]
 
+  const cat = openCat ? CATEGORIES.find((c) => c.key === openCat) ?? null : null
+
+  // ===== Внутренняя страница категории =====
+  if (cat && cat.items) {
+    const CatIcon = cat.icon
+    return (
+      <div className="w-full max-w-3xl mx-auto px-4 pb-10 pt-4 flex flex-col gap-5">
+        <div className="flex items-center justify-between gap-3">
+          <Button2 onClick={() => onOpenCat(null)}>
+            <ArrowLeft className="w-4 h-4" /> Категории
+          </Button2>
+        </div>
+
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 w-11 h-11 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0">
+            <CatIcon className="w-5 h-5 text-emerald-400" />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-light text-stone-50">{cat.title}</h1>
+            <p className="text-sm text-stone-400">{cat.blurb}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {cat.items.map((m) => (
+            <ModeCardButton key={m.id} m={m} onSelect={onSelect} />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // ===== Главная: категории =====
   return (
     <div className="w-full max-w-3xl mx-auto px-4 pb-10 pt-6 flex flex-col gap-6">
       {/* Шапка */}
@@ -114,7 +197,7 @@ export function HomeView({ onSelect }: { onSelect: (v: ViewId) => void }) {
           Бесплатная тренировка покерных навыков: Texas Hold&apos;em и Омаха — решения, математика,
           аутсы, эквити и диапазоны — без регистрации и подписок.
         </p>
-        <div className="flex items-center gap-4 text-sm">
+        <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
           <span className="flex items-center gap-1.5 text-stone-200">
             <Flame className="w-4 h-4" />
             Серия: {streak} дн.{bestStreak > streak ? ` (рекорд ${bestStreak})` : ''}
@@ -181,68 +264,50 @@ export function HomeView({ onSelect }: { onSelect: (v: ViewId) => void }) {
         </button>
       </section>
 
-      {/* Режимы по категориям */}
-      {CATEGORIES.map((cat) => {
-        const CatIcon = cat.icon
-        return (
-          <section key={cat.title} aria-label={cat.title} className="flex flex-col gap-3">
-            {cat.items.length > 1 && (
-              <h2 className="text-xs font-normal text-stone-400 uppercase tracking-wider flex items-center gap-2 px-1">
-                <CatIcon className="w-4 h-4 text-emerald-500" />
-                {cat.title}
-              </h2>
-            )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {cat.items.map((m) => {
-                const Icon = m.icon
-                const acc = m.trainer ? accuracy(stats[m.trainer].correct, stats[m.trainer].attempts) : null
-                return (
-                  <button key={m.id} type="button" onClick={() => onSelect(m.id)} className="text-left">
-                    <Card className="border-stone-800 bg-gradient-to-br from-neutral-800/70 to-neutral-900/85 hover:from-neutral-700/75 hover:to-neutral-800/95 transition-all hover:border-emerald-500/40 h-full">
-                      <CardContent className="p-4 flex items-start gap-3">
-                        <div className="mt-0.5 w-10 h-10 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0">
-                          <Icon className="w-5 h-5 text-emerald-400" />
-                        </div>
-                        <div className="min-w-0">
-                          <h2 className="font-normal text-stone-100 text-base sm:text-lg">{m.title}</h2>
-                          <p className="text-xs text-stone-400 mt-0.5">{m.desc}</p>
-                          {acc !== null && (
-                            <p className={cn('text-xs mt-1.5 font-normal', acc >= 70 ? 'text-emerald-400' : 'text-stone-400')}>
-                              Точность: {acc}%
-                            </p>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </button>
-                )
-              })}
-            </div>
-          </section>
-        )
-      })}
-
-      {/* Помочь проекту */}
-      <section aria-label="Помочь проекту" className="flex flex-col gap-3">
-        <h2 className="text-xs font-normal text-stone-400 uppercase tracking-wider flex items-center gap-2 px-1">
-          <Heart className="w-4 h-4 text-emerald-500" />
-          Помочь проекту
-        </h2>
-        <button type="button" onClick={() => onSelect('donate')} className="text-left">
-          <Card className="border-emerald-900/60 bg-gradient-to-br from-emerald-950/50 to-neutral-900/85 hover:from-emerald-900/40 hover:to-neutral-800/95 transition-all hover:border-emerald-500/40">
-            <CardContent className="p-4 flex items-start gap-3">
-              <div className="mt-0.5 w-10 h-10 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0">
-                <Heart className="w-5 h-5 text-emerald-400" />
-              </div>
-              <div className="min-w-0">
-                <h2 className="font-normal text-stone-100 text-base sm:text-lg">Поддержать на Boosty</h2>
-                <p className="text-xs text-stone-400 mt-0.5">
-                  Донат помогает платить за хостинг и развивать тренажёр. Необязательно — все режимы остаются бесплатными.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </button>
+      {/* Категории: клик по разделу открывает его наполнение */}
+      <section aria-label="Разделы" className="grid grid-cols-2 gap-3">
+        {CATEGORIES.map((c) => {
+          const Icon = c.icon
+          const isDonate = c.key === 'donate'
+          return (
+            <button
+              key={c.key}
+              type="button"
+              onClick={() => {
+                if (c.direct) {
+                  onOpenCat(null)
+                  onSelect(c.direct)
+                } else {
+                  onOpenCat(c.key)
+                }
+              }}
+              className={cn('text-left', isDonate && 'col-span-2')}
+            >
+              <Card className={cn(
+                'h-full transition-all hover:border-emerald-500/40',
+                isDonate
+                  ? 'border-emerald-900/60 bg-gradient-to-br from-emerald-950/50 to-neutral-900/85 hover:from-emerald-900/40'
+                  : 'border-stone-800 bg-gradient-to-br from-neutral-800/70 to-neutral-900/85 hover:from-neutral-700/75 hover:to-neutral-800/95',
+              )}>
+                <CardContent className={cn('p-4 flex gap-3 items-start', isDonate && 'items-center')}>
+                  <div className="mt-0.5 w-10 h-10 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                    <Icon className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <h2 className="font-normal text-stone-100 text-base">{c.title}</h2>
+                      {c.items && <ChevronRight className="w-3.5 h-3.5 text-stone-500 shrink-0" />}
+                    </div>
+                    <p className="text-xs text-stone-400 mt-0.5">{c.blurb}</p>
+                    {c.items && (
+                      <p className="text-[11px] text-stone-500 mt-1.5">{c.items.length} режим{c.items.length === 1 ? '' : c.items.length < 5 ? 'а' : 'ов'}</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </button>
+          )
+        })}
       </section>
 
       {/* Информация */}
@@ -264,5 +329,18 @@ export function HomeView({ onSelect }: { onSelect: (v: ViewId) => void }) {
         Играйте ответственно. Покер-навыки тренируются практикой — по 10–15 минут в день.
       </footer>
     </div>
+  )
+}
+
+/** Локальная кнопка-назад (в стиле ghost). */
+function Button2({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-2 rounded-md px-3 h-9 text-sm text-stone-300 hover:text-white hover:bg-stone-800/60 transition"
+    >
+      {children}
+    </button>
   )
 }

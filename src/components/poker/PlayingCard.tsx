@@ -7,16 +7,25 @@ import { cn } from '@/lib/utils'
 interface PlayingCardProps {
   card?: Card | null
   faceDown?: boolean
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'xs' | 'sm' | 'md' | 'lg'
   highlighted?: boolean
   dimmed?: boolean
   className?: string
 }
 
 const sizeClasses = {
+  xs: 'w-7 h-10 text-[10px] rounded',
   sm: 'w-9 h-13 text-sm rounded-md',
   md: 'w-12 h-17 text-base rounded-lg',
   lg: 'w-16 h-22 text-xl rounded-lg',
+}
+
+// размер символа масти подбирается под размер карты
+const suitSizes = {
+  xs: 'text-[13px]',
+  sm: 'text-lg',
+  md: 'text-2xl',
+  lg: 'text-3xl',
 }
 
 export function PlayingCard({ card, faceDown, size = 'md', highlighted, dimmed, className }: PlayingCardProps) {
@@ -48,7 +57,7 @@ export function PlayingCard({ card, faceDown, size = 'md', highlighted, dimmed, 
       aria-label={`${RANK_CHARS[card.r - 2]} ${SUIT_SYMBOLS[card.s]}`}
     >
       <span className="absolute top-0.5 left-1 font-bold leading-none">{RANK_CHARS[card.r - 2]}</span>
-      <span className="text-2xl leading-none">{SUIT_SYMBOLS[card.s]}</span>
+      <span className={cn('leading-none', suitSizes[size])}>{SUIT_SYMBOLS[card.s]}</span>
       <span className="absolute bottom-0.5 right-1 font-bold leading-none rotate-180">{RANK_CHARS[card.r - 2]}</span>
     </div>
   )
@@ -57,7 +66,7 @@ export function PlayingCard({ card, faceDown, size = 'md', highlighted, dimmed, 
 /** Ряд карт с небольшим наложением */
 export function CardRow({ cards, size = 'md', highlight, dim, className }: {
   cards: (Card | null)[]
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'xs' | 'sm' | 'md' | 'lg'
   highlight?: Card[]
   dim?: Card[]
   className?: string

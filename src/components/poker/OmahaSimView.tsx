@@ -22,6 +22,7 @@ import {
   genOmahaSimExam,
   ExamLength,
   isOmahaSimActionCorrect,
+  advanceOmahaSimStreet,
 } from '@/lib/poker/omahaSim'
 import { POSITION_NAMES_RU } from '@/lib/poker/ranges'
 import type { GameKind } from '@/lib/poker/handRanges'
@@ -195,6 +196,8 @@ export function OmahaSimView({ variant, onBack, onOpenGto }: { variant: DoubleVa
   const [scenario, setScenario] = useState<OmahaSimScenario | null>(null)
   const [answered, setAnswered] = useState<OmahaSimAction | null>(null)
   const [hintShown, setHintShown] = useState(false)
+  // наблюдение после фолда: доски открываются дальше без решений — «что было бы»
+  const [observing, setObserving] = useState(false)
 
   // состояние экзамена
   const [examState, setExamState] = useState<ExamState>('idle')
@@ -207,6 +210,21 @@ export function OmahaSimView({ variant, onBack, onOpenGto }: { variant: DoubleVa
     setScenario(genOmahaSimScenario(holeCount))
     setAnswered(null)
     setHintShown(false)
+    setObserving(false)
+  }
+
+  /** Следующая улица раздачи: обе доски открываются синхронно. */
+  function advanceStreet() {
+    setScenario((s) => (s ? advanceOmahaSimStreet(s) : s))
+    setAnswered(null)
+    setHintShown(false)
+    window.scrollTo({ top: 0 })
+  }
+
+  /** После фолда: продолжаем открывать доски в режиме наблюдения. */
+  function watchRunout() {
+    setObserving(true)
+    advanceStreet()
   }
 
   function answer(a: OmahaSimAction) {
@@ -311,6 +329,31 @@ export function OmahaSimView({ variant, onBack, onOpenGto }: { variant: DoubleVa
             </Badge>
           )}
         </div>
+
+        {sc.kind === 'postflop' && (
+          <div className="flex items-center gap-1.5">
+            {(['Флоп', 'Терн', 'Ривер'] as const).map((s, i) => {
+              const st = 3 + i
+              const opened = st <= sc.boardStreet
+              return (
+                <span
+                  key={s}
+                  className={cn(
+                    'px-2 py-0.5 rounded-full border text-[11px] leading-none',
+                    opened && st === sc.boardStreet
+                      ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-300'
+                      : opened
+                        ? 'border-emerald-900/60 text-emerald-500/80'
+                        : 'border-stone-700 text-stone-500',
+                  )}
+                >
+                  {s}
+                </span>
+              )
+            })}
+            <span className="text-[10px] text-stone-500 ml-1">доски открываются синхронно</span>
+          </div>
+        )}
 
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-3">
@@ -519,12 +562,14 @@ export function OmahaSimView({ variant, onBack, onOpenGto }: { variant: DoubleVa
         <ScenarioCard>
           <p className="text-sm text-stone-300">
             Симулятор раздач {holeCount}-card Омахи на двух досках. Каждая раздача — реальные
-            решения: открыть, защищаться против рейза, играть постфлоп на двух бордах.
-            После ответа — разбор с GTO-чартом позиции и эквити по каждой доске.
+            решения: открыть, защищаться против рейза, играть постфлоп на двух бордах от флопа
+            до ривера. После ответа — разбор с эквити по каждой доске и GTO-ориентиром.
           </p>
           <ul className="text-xs text-stone-400 list-disc pl-4 flex flex-col gap-1">
             <li>Комбинация — ровно 2 карты руки + 3 с доски</li>
             <li>Каждая доска — отдельная половина банка, эквити усредняется</li>
+            <li>Постфлоп — раздача целиком: два флопа открываются синхронно, затем два терна и два ривера; решение против ставки на каждой улице</li>
+            <li>После фолда доски можно открыть дальше — посмотреть, что было бы</li>
             <li>Префлоп — по GTO-чартам позиции: диапазон зависит от позиции и размера стола (2–9 max)</li>
             <li>По кнопке «Подсказка» — эквити до ответа (постфлоп) или место руки по чарту (префлоп); раздача с подсказкой не идёт в статистику</li>
             <li>После ответа — чарт позиции и переход в раздел GTO с вашими параметрами</li>
@@ -585,6 +630,8 @@ export function OmahaSimView({ variant, onBack, onOpenGto }: { variant: DoubleVa
 
   const correct = isOmahaSimActionCorrect(scenario, answered)
   const isPostflop = scenario.kind === 'postflop'
+  // раздачу можно продолжить: следующая улица обеих досок (флоп → терн → ривер)
+  const canAdvance = isPostflop && scenario.boardStreet < 5 && !!scenario.fullBoards
 
   // панель эквити: до ответа (по подсказке) и после ответа
   const equityPanel = isPostflop && scenario.sim ? (
@@ -638,9 +685,33 @@ export function OmahaSimView({ variant, onBack, onOpenGto }: { variant: DoubleVa
           </div>
         )}
 
-        {!answered && actionButtons(scenario, answer)}
+        {!answered && observing && scenario && (
+          <div className="flex flex-col gap-2">
+            <div className="rounded-lg border border-stone-700/70 bg-stone-900/60 p-3 flex flex-col gap-1.5">
+              <p className="text-xs text-stone-300">
+                Вы сфолдили — доски открываются дальше для наглядности. Решения больше не требуются.
+              </p>
+              {scenario.sim && (
+                <p className="text-xs text-stone-400">
+                  Эквити по банку на этой улице: <b className="text-stone-200">{(scenario.sim.total * 100).toFixed(1)}%</b> (требуемые {scenario.requiredPct}%).
+                </p>
+              )}
+            </div>
+            {scenario.boardStreet < 5 ? (
+              <Button onClick={advanceStreet} className="bg-emerald-600 text-white hover:bg-emerald-500 w-fit">
+                {scenario.boardStreet === 3 ? 'Открыть терн' : 'Открыть ривер'}
+              </Button>
+            ) : (
+              <Button onClick={next} className="bg-emerald-600 text-white hover:bg-emerald-500 w-fit">
+                Следующая раздача
+              </Button>
+            )}
+          </div>
+        )}
 
-        {!answered && !hintShown && (
+        {!answered && !observing && actionButtons(scenario, answer)}
+
+        {!answered && !observing && !hintShown && (
           <Button
             variant="ghost"
             size="sm"
@@ -662,8 +733,17 @@ export function OmahaSimView({ variant, onBack, onOpenGto }: { variant: DoubleVa
             detail={hintShown
               ? [...scenario.detail, 'Подсказка использована — раздача не учтена в статистике.']
               : scenario.detail}
-            onNext={next}
-            nextLabel="Следующая раздача"
+            onNext={isPostflop && canAdvance ? (answered === 'fold' ? watchRunout : advanceStreet) : next}
+            nextLabel={
+              isPostflop && canAdvance
+                ? answered === 'fold'
+                  ? 'Смотреть, что откроется'
+                  : scenario.boardStreet === 3
+                    ? 'Открыть терн'
+                    : 'Открыть ривер'
+                : 'Следующая раздача'
+            }
+            secondary={isPostflop && canAdvance ? { label: 'Новая раздача', onClick: next } : undefined}
           />
           {isPostflop && equityPanel}
           {!isPostflop && scenario.chart && (
