@@ -23,13 +23,13 @@ export default function manifest(): MetadataRoute.Manifest {
     lang: "ru",
     icons: [
       {
-        src: `${basePath}/icons/icon-192.png`,
+        src: `${basePath}/icons/icon-192.png?v=2`,
         sizes: "192x192",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: `${basePath}/icons/icon-512.png`,
+        src: `${basePath}/icons/icon-512.png?v=2`,
         sizes: "512x512",
         type: "image/png",
         purpose: "any",

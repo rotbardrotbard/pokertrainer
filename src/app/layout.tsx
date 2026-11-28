@@ -26,11 +26,11 @@ export const metadata: Metadata = {
   keywords: ["покер", "тренажёр", "Suited", "Texas Holdem", "Омаха", "Omaha", "PLO", "эквити", "аутсы", "пот-оддсы", "GTO", "диапазоны"],
   icons: {
     icon: [
-      { url: `${bp}/icons/icon-192.png`, sizes: "192x192", type: "image/png" },
-      { url: `${bp}/icons/icon-512.png`, sizes: "512x512", type: "image/png" },
+      { url: `${bp}/icons/icon-192.png?v=2`, sizes: "192x192", type: "image/png" },
+      { url: `${bp}/icons/icon-512.png?v=2`, sizes: "512x512", type: "image/png" },
     ],
     apple: [
-      { url: `${bp}/icons/apple-touch-icon.png`, sizes: "180x180", type: "image/png" },
+      { url: `${bp}/icons/apple-touch-icon.png?v=2`, sizes: "180x180", type: "image/png" },
     ],
   },
   // iOS «На экран „Домой“»: запуск без панели браузера (standalone).
